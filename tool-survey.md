@@ -6,7 +6,7 @@
 
 ## 工具盤點（2026-06-17，Explore agent 核對 repo 既有 finding）
 
-> ⚠️ **幻覺黑名單（勿規劃）**：`amPerl/nif`（Rust `nif2gltf` CLI）**不存在**；`SkyMeshGLTF` 來源存疑。兩者 Gemini 捏造，[nif-gltf finding banner](../gemini-research/worldspace-editor/nif-gltf-conversion.md) 已標。
+> ⚠️ **幻覺黑名單（勿規劃）**：`amPerl/nif`（Rust `nif2gltf` CLI）**不存在**；`SkyMeshGLTF` 來源存疑。兩者 Gemini 捏造，[nif-gltf finding banner](../ModForge/sub_projs/gemini-research/worldspace-editor/nif-gltf-conversion.md) 已標。
 
 | 工具 | 方向 | 平台 | 型態 | 確認度 |
 |---|---|---|---|---|
@@ -16,7 +16,7 @@
 | **ck-cmd** | **FBX**↔nif（**非 glTF**） | Win / Wine | CLI | ✅ 真實，但**不直接吃 glTF**（要 FBX 中轉） |
 | **Compressonator** | dds 編碼 | Linux/Win/Mac | CLI | ✅ 真實（model-porting 已選定） |
 
-**現況關鍵缺口**：外部工具裡**沒有任何已驗證的「批量 nif→glTF」pipeline**（PyNifly+Blender 卡 Win-only；NifSkope fork 批量未證）。→ 即本 sub_proj 改自寫的動機。
+**現況關鍵缺口**：外部工具裡**沒有任何已驗證的「批量 nif→glTF」pipeline**（PyNifly+Blender 卡 Win-only；NifSkope fork 批量未證）。→ 即本 repo 改自寫的動機。
 
 ## 跨平台架構難點（決定工具長相）
 

@@ -2,9 +2,9 @@
 
 ← [README](README.md)
 
-**狀態：契約已實作（2026-06-17）。** 契約形狀已定，且**參考後端已自寫**＝本 sub_proj 的 `nif2gltf` Python 模組（LE+SSE 靜態 mesh、`--flat`、batch manifest，23 測綠）；不再依賴 NifSkope。本檔定義「呼叫方看到什麼」，與用哪個後端解耦——後端換掉，契約不動。**唯一未竟＝對真實 vanilla `.nif` 的 byte 驗證**（離線無素材，見 README Open / WAIT_USER）。
+**狀態：契約已實作（2026-06-17）。** 契約形狀已定，且**參考後端已自寫**＝本 repo 的 `nif2gltf` Python 模組（LE+SSE 靜態 mesh、`--flat`、batch manifest，23 測綠）；不再依賴 NifSkope。本檔定義「呼叫方看到什麼」，與用哪個後端解耦——後端換掉，契約不動。**唯一未竟＝對真實 vanilla `.nif` 的 byte 驗證**（離線無素材，見 README Open / WAIT_USER）。
 
-## 定位（照 [skyrim-voicegen](../skyrim-voicegen/README.md) 的掛法）
+## 定位（照 [skyrim-voicegen](../ModForge/sub_projs/skyrim-voicegen/README.md) 的掛法）
 
 model-converter 是**黑盒 exec**，不整合進 ModForge / Godot editor。掛勾＝環境變數 **`MODFORGE_NIF2GLTF_BIN`**，指向一支 wrapper（在自己的 venv / 環境內跑選定後端）。呼叫方只給 args、只收 glTF；轉換器只看 args、不認得呼叫方。**互不整合。**
 
@@ -72,12 +72,12 @@ nif2gltf --manifest <manifest.json> --outdir <dir>
 ## 環境（不進 repo，照 voicegen 慣例）
 
 - `MODFORGE_NIF2GLTF_BIN` — wrapper 路徑（呼叫方 export）。
-- **參考 wrapper**：一行殼呼 `python -m nif2gltf "$@"`（在本 sub_proj 的 `.venv` 內）。venv / 後端工具是內政，gitignore 留本機。
+- **參考 wrapper**：一行殼呼 `python -m nif2gltf "$@"`（在本 repo 的 `.venv` 內）。venv / 後端工具是內政，gitignore 留本機。
 - ✅ **後端已自寫**（取代原「待證 NifSkope」）：`nif2gltf` 純 Python 靜態 NIF mesh parser，照本契約輸出 `.gltf`+`.bin`，不需任何外部 NIF 工具。MVP 後的紋理/蒙皮/正向才可能再掛 PyNifly 等 Windows 後端。
 
 ## 反向命令：glTF → NIF（`gltf2nif`，2026-07-05）
 
-nif→glTF 的鏡像方向，供 [darksouls-port](../darksouls-port/plan.md) 的資產移植管線消費。**dumb 工具**：一個 glTF → 一個 `.nif`，不認呼叫方、不讀 ESM。參考後端＝本 sub_proj 的 `gltf2nif` Python 模組（欄位表與選值見 [gltf2nif/README.md](gltf2nif/README.md)）。
+nif→glTF 的鏡像方向，供 [darksouls-port](../ModForge/sub_projs/darksouls-port/plan.md) 的資產移植管線消費。**dumb 工具**：一個 glTF → 一個 `.nif`，不認呼叫方、不讀 ESM。參考後端＝本 repo 的 `gltf2nif` Python 模組（欄位表與選值見 [gltf2nif/README.md](gltf2nif/README.md)）。
 
 ```
 gltf2nif <in.gltf> <out.nif> [--texprefix <textures\prefix>] [--collision <hulls.json>] [--root-name <name>]
@@ -95,8 +95,8 @@ gltf2nif <in.gltf> <out.nif> [--texprefix <textures\prefix>] [--collision <hulls
 
 **Exit code**：`0` 成功／`1` 一般錯誤（args、寫檔、碰撞解析）／`2` glTF 解析失敗。
 
-**驗證保證**：輸出可被本 sub_proj 的 `nif2gltf` parser 讀回，三角形/頂點座標（誤差容忍內）/UV/貼圖路徑與輸入一致；每個位元組佈局對過真實 vanilla SSE nif。契約 backend-agnostic。
+**驗證保證**：輸出可被本 repo 的 `nif2gltf` parser 讀回，三角形/頂點座標（誤差容忍內）/UV/貼圖路徑與輸入一致；每個位元組佈局對過真實 vanilla SSE nif。契約 backend-agnostic。
 
 ## 與 ModForge `package` 的關係
 
-nif→glTF 是**反向**（純預覽代理）；glTF→nif（`gltf2nif`，上節）是**移植方向**，產出的 `.nif`+`.dds` 進 ModForge spec 的 `assets/`，由 `package`（`StaticSpec.Model`）打包。正向（一般外部→nif）決策真相在 [model-porting/](../../workflows/idea/asset-pipelines/model-porting/README.md)。
+nif→glTF 是**反向**（純預覽代理）；glTF→nif（`gltf2nif`，上節）是**移植方向**，產出的 `.nif`+`.dds` 進 ModForge spec 的 `assets/`，由 `package`（`StaticSpec.Model`）打包。正向（一般外部→nif）決策真相在 [model-porting/](../ModForge/workflows/idea/asset-pipelines/model-porting/README.md)。

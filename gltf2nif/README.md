@@ -1,8 +1,8 @@
 # gltf2nif — glTF 靜態 mesh → Skyrim SSE `.nif` 寫出器
 
-← [model-converter README](../README.md)｜[PROTOCOL](../PROTOCOL.md)｜正向對照鏡子：[`nif2gltf/`](../nif2gltf/README.md)（本模組的欄位佈局以它的 parser 為權威）
+← [model-converter README](../README.md)｜[PROTOCOL](../PROTOCOL.md)｜正向對照鏡子：[`nif2gltf/`](../nif2gltf/)（模組職責表見 [README §實作](../README.md)；本模組的欄位佈局以它的 parser 為權威）
 
-model-converter 的**反向後端**：把 glTF 2.0 靜態 mesh 寫成 Skyrim Special Edition 的 `.nif`（`BSTriShape` 幾何 + `BSLightingShaderProperty` 材質 + 選配 `bhk` 碰撞）。直接服務 [darksouls-port](../../darksouls-port/plan.md) 的 `FLVER→glTF→NIF` 管線。
+model-converter 的**反向後端**：把 glTF 2.0 靜態 mesh 寫成 Skyrim Special Edition 的 `.nif`（`BSTriShape` 幾何 + `BSLightingShaderProperty` 材質 + 選配 `bhk` 碰撞）。直接服務 [darksouls-port](../../ModForge/sub_projs/darksouls-port/plan.md) 的 `FLVER→glTF→NIF` 管線。
 
 **第一道驗證＝round-trip**：寫出的 `.nif` 丟回 `nif2gltf` parser 讀，三角形/頂點/UV/貼圖路徑要對得回輸入 glTF。寫出器的每個位元組佈局都對過真實 vanilla SSE nif（一顆帶 `BSTriShape`+`BSLightingShaderProperty`+`bhkRigidBody` 的市售 mesh）與 `nif2gltf` reader。
 
