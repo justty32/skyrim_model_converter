@@ -1,0 +1,15 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Downloaded format reference (re-fetch on demand from niftools/nifxml)
+_nifxml_ref.xml
+
+# Backend tool installs & local env (per PROTOCOL.md: 後端載體 gitignore 留本機)
+backend/
+*.glb
+*.gltf
+*.bin
+!tests/**/*.gltf
