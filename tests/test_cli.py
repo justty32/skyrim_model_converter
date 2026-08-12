@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from unittest.mock import patch
 
 from pygltflib import GLTF2
 
@@ -39,6 +40,14 @@ def test_missing_args_returns_1(tmp_path):
 def test_missing_source_returns_1(tmp_path):
     out = str(tmp_path / "x.gltf")
     assert main(["--in", str(tmp_path / "nope.nif"), "--out", out]) == 1
+
+
+def test_output_failure_returns_1_without_traceback(tmp_path, capsys):
+    nif = str(tmp_path / "rock.nif")
+    _write_nif(nif, build_le_nif(VERTS, NORMALS, UVS, TRI))
+    with patch("nif2gltf.cli.write_gltf", side_effect=OSError("disk full")):
+        assert main(["--in", nif, "--out", str(tmp_path / "rock.gltf"), "--flat"]) == 1
+    assert "error: writing glTF" in capsys.readouterr().err
 
 
 def test_bad_version_returns_2(tmp_path):

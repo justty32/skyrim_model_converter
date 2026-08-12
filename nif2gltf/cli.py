@@ -28,7 +28,11 @@ def _convert(in_path: str, out_path: str) -> int:
     except Exception as exc:  # noqa: BLE001 - any backend failure is a general error
         print(f"error: {in_path}: {exc}", file=sys.stderr)
         return 1
-    write_gltf(meshes, out_path)
+    try:
+        write_gltf(meshes, out_path)
+    except Exception as exc:  # noqa: BLE001 - output failures are general CLI errors
+        print(f"error: writing glTF: {out_path}: {exc}", file=sys.stderr)
+        return 1
     return 0
 
 

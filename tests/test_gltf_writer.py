@@ -80,6 +80,23 @@ def test_flat_material_has_no_textures(tmp_path):
     assert not gltf.images
 
 
+def test_flat_default_ignores_source_texture_and_removes_stale_sidecar(tmp_path):
+    mesh = _unit_triangle()
+    mesh.texture = r"textures\landscape\rock.dds"
+    out = str(tmp_path / "tri.gltf")
+    sidecar = tmp_path / "tri.textures.json"
+    sidecar.write_text("stale", encoding="utf-8")
+
+    write_gltf([mesh], out)
+
+    gltf = GLTF2().load(out)
+    assert gltf.meshes[0].primitives[0].material == 0
+    assert len(gltf.materials) == 1
+    assert not gltf.textures
+    assert not gltf.images
+    assert not sidecar.exists()
+
+
 def test_mesh_without_normals_or_uvs(tmp_path):
     m = Mesh(
         name="bare",

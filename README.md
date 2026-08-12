@@ -52,7 +52,7 @@ MVP 已改自寫純 Python 後端（見下「實作」節），不再依賴外�
 
 **格式來源**：niftools/nifxml `nif.xml`（逐欄查證，非憑記憶；reference 檔 gitignore）。
 **跑**：`python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt`，然後 `python -m nif2gltf --in foo.nif --out foo.gltf --flat`。
-**測**：`.venv/Scripts/python -m pytest`（**53 綠**：nif2gltf 正向 24 [glTF writer round-trip 7 / NIF reader LE+SSE 合成 fixture 10 / CLI 契約 7] + gltf2nif 反向 29）。
+**測**：`.venv/Scripts/python -m pytest`（**55 綠**：nif2gltf 正向 26 [glTF writer round-trip 8 / NIF reader LE+SSE 合成 fixture 10 / CLI 契約 8] + gltf2nif 反向 29）。
 ⚠️ **離線限制**：合成 fixture 只證「reader 讀回它照 nif.xml 編的東西」，**未對真實 vanilla `.nif` 逐 byte 驗**（離線無遊戲素材）——SSE offset 解碼尤其需真檔確認，列 WAIT_USER。
 
 ## 實作（`gltf2nif/` — 反向後端，2026-07-05）
