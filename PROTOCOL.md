@@ -8,6 +8,11 @@
 
 model-converter 是**黑盒 exec**，不整合進 ModForge / Godot editor。掛勾＝環境變數 **`MODFORGE_NIF2GLTF_BIN`**，指向一支 wrapper（在自己的 venv / 環境內跑選定後端）。呼叫方只給 args、只收 glTF；轉換器只看 args、不認得呼叫方。**互不整合。**
 
+Godot worldspace editor 的 production `ModelFetch` 已直接遵守這個掛勾：env hook
+存在時 executable 直接收到下述 protocol args；未設定時才採可預期的同層 checkout
+fallback（`model-converter/.venv/.../python -m nif2gltf`）。明示但不存在的 hook 是設定錯誤，
+不得靜默換 backend。
+
 ```
 driver  ──(--in foo.nif --out foo.gltf [--flat])──►  nif2gltf  ──► writes foo.gltf (+ .bin/貼圖)
 ```
@@ -59,6 +64,8 @@ nif2gltf --manifest <manifest.json> --outdir <dir>
 - 成功 → `--out` 路徑存在且為合法 glTF 2.0（`.gltf` + 旁邊 `.bin`，或自包含 `.glb`——**待定：MVP 先 `.gltf`+`.bin`**）。
 - 幾何：座標軸對 Godot（Y-up、公尺）；**法線約定** Skyrim DirectX(Y−) → glTF/Godot OpenGL(Y+) 需 **Flip Y**（見 README「紋理 round-trip」）。
 - `--flat`：單一 `StandardMaterial`，無貼圖引用。
+- consumer 必須把 `.gltf` 與同 stem `.bin` 視為同一次發布；nonzero 或任一缺漏皆失敗，
+  不得沿用同 output key 的 stale/partial 檔。
 
 ## Exit code
 
@@ -74,6 +81,18 @@ nif2gltf --manifest <manifest.json> --outdir <dir>
 - `MODFORGE_NIF2GLTF_BIN` — wrapper 路徑（呼叫方 export）。
 - **參考 wrapper**：一行殼呼 `python -m nif2gltf "$@"`（在本 repo 的 `.venv` 內）。venv / 後端工具是內政，gitignore 留本機。
 - ✅ **後端已自寫**（取代原「待證 NifSkope」）：`nif2gltf` 純 Python 靜態 NIF mesh parser，照本契約輸出 `.gltf`+`.bin`，不需任何外部 NIF 工具。MVP 後的紋理/蒙皮/正向才可能再掛 PyNifly 等 Windows 後端。
+
+## Live consumer contract
+
+同層 `godot-worldspace-editor/tests/test_model_fetch_contract.py` 會用本 repo 的 synthetic
+NIF fixture 經 production CLI 寫 `.gltf + .bin`，再交給 Godot 4.6 production
+`ModelFetch._load_gltf()`。它驗 Node3D、mesh/primitive/vertices、非對稱軸向與尺度，並驗
+missing bin、bad glTF、converter nonzero fail closed；整個 Godot project 在 temp copy 執行。
+
+```powershell
+$env:GODOT_BIN = 'C:\path\to\Godot_v4.6-stable_win64_console.exe'
+python ..\godot-worldspace-editor\tests\test_model_fetch_contract.py
+```
 
 ## 反向命令：glTF → NIF（`gltf2nif`，2026-07-05）
 
