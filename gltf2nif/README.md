@@ -38,6 +38,8 @@ glTF (x, y, z)  →  Skyrim (x, −z, y)            # normal / 平面（方向�
 ## 幾何：`BSTriShape` / `BSVertexData`
 
 - 一 glTF primitive → 一 `BSTriShape`，全部掛在根 `NiNode` 下（shape 本身 transform 單位化，座標烘進頂點）。
+- 只讀 active scene 的 node hierarchy；TRS／matrix（含 parent transform）烘進頂點，mesh instance 各自輸出，normal 走 inverse-transpose，鏡射 transform 自動反轉 winding。
+- primitive 僅接受 TRIANGLES；支援核心 glTF 的 normalized UBYTE/USHORT TEXCOORD accessor，壞 attribute／index／sparse accessor 明確拒絕。
 - 頂點格式＝**vanilla 靜態的 full-precision 佈局**（stride 28）：
 
   | offset | 欄位 | 型別 |
