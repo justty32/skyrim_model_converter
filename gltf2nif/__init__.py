@@ -6,6 +6,8 @@ from ._binwriter import GltfError
 from .collision import Hull, load_hulls
 from .geometry import Mesh
 from .gltf_reader import read_gltf
+from .material import MaterialSpec, read_materials, specs_for_meshes
 from .nif_writer import build_nif
 
-__all__ = ["build_nif", "read_gltf", "load_hulls", "Mesh", "Hull", "GltfError"]
+__all__ = ["build_nif", "read_gltf", "load_hulls", "Mesh", "Hull", "GltfError",
+           "MaterialSpec", "read_materials", "specs_for_meshes"]

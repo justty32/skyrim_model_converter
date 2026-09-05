@@ -170,6 +170,14 @@ def _transform_geometry(positions, normals, matrix: np.ndarray):
     return points, directions
 
 
+def _material_index(gltf: GLTF2, prim) -> int:
+    """Primitive's glTF material index, or -1 when absent/out of range."""
+    materials = gltf.materials or []
+    if prim.material is None or prim.material < 0 or prim.material >= len(materials):
+        return -1
+    return int(prim.material)
+
+
 def _material_basename(gltf: GLTF2, prim) -> str:
     if prim.material is None or prim.material < 0 or prim.material >= len(gltf.materials):
         return ""
@@ -269,6 +277,7 @@ def read_gltf(path: str) -> list[Mesh]:
                 name=node_name or gmesh.name or f"mesh_{mi}_{pi}",
                 positions=positions, normals=normals, uvs=uvs, triangles=tris,
                 material=_material_basename(gltf, prim),
+                material_index=_material_index(gltf, prim),
             ))
     if not meshes:
         raise GltfError("glTF has no triangle geometry")

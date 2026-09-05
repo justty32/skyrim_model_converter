@@ -49,6 +49,10 @@ class Mesh:
     triangles: list[tuple[int, int, int]] = field(default_factory=list)
     # Texture base name from the glTF material (extension stripped), e.g. "m18_wall_07".
     material: str = ""
+    # glTF material index of the source primitive (-1 = none). Appended, defaulted:
+    # lets gltf2nif.material.specs_for_meshes align PBR specs with the node x primitive
+    # walk order without replaying it. Purely informational - no effect on NIF bytes.
+    material_index: int = -1
 
     @property
     def has_normals(self) -> bool:
