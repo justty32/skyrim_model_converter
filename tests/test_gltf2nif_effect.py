@@ -73,3 +73,11 @@ def test_lighting_remains_the_default_shader_kind():
                      material_specs=[MaterialSpec()])
     assert "BSLightingShaderProperty" in _header(data)["types"]
     assert "BSEffectShaderProperty" not in _header(data)["types"]
+
+
+def test_blended_effect_enables_vertex_alpha_shader_flag():
+    spec = MaterialSpec(shader_kind="effect", alpha_mode="BLEND")
+    data = build_nif([_mesh()], r"textures\dsport", [False], material_specs=[spec])
+    header = _header(data)
+    offset = header["offsets"][header["types"].index("BSEffectShaderProperty")]
+    assert struct.unpack_from("<I", data, offset + 16)[0] & 0x8

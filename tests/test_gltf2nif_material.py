@@ -345,6 +345,18 @@ def test_blend_material_emits_a_nialphaproperty():
     assert flags == 0x00ED
     assert threshold == 0
     assert _shape_alpha_ref(data) != -1
+    assert _lsp_u32(data, 16) & 0x8
+
+
+def test_vertex_alpha_shader_flag_is_only_enabled_for_blend():
+    opaque = build_nif([_tri()], TEXPREFIX, [True], material_specs=[_spec()])
+    mask = build_nif([_tri()], TEXPREFIX, [True],
+                     material_specs=[_spec(alpha_mode="MASK")])
+    blend = build_nif([_tri()], TEXPREFIX, [True],
+                      material_specs=[_spec(alpha_mode="BLEND")])
+    assert not _lsp_u32(opaque, 16) & 0x8
+    assert not _lsp_u32(mask, 16) & 0x8
+    assert _lsp_u32(blend, 16) & 0x8
 
 
 def test_mask_material_encodes_the_cutoff_as_the_threshold():

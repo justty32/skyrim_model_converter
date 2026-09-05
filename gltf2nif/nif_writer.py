@@ -88,6 +88,7 @@ _LSP_SHADER_FLAGS1 = 0x82400301
 # Double-sided sidesteps the whole orientation question for ported geometry.
 _LSP_SHADER_FLAGS2_BASE = 0x00008021
 _SLSF1_SPECULAR = 0x00000001
+_SLSF1_VERTEX_ALPHA = 0x00000008
 _SLSF2_DOUBLE_SIDED = 0x00000010
 _LSP_SHADER_FLAGS2 = _LSP_SHADER_FLAGS2_BASE | _SLSF2_DOUBLE_SIDED
 _LSP_GLOSSINESS = 80.0
@@ -286,6 +287,8 @@ def _build_lsp(name_idx: int, texset_ref: int, spec: MaterialSpec | None = None,
         # saves the specular pass. Anything else keeps the vanilla-static combo.
         if float(spec.metallic) == 0.0 and float(spec.roughness) >= 0.95:
             flags1 &= ~_SLSF1_SPECULAR
+        if (spec.alpha_mode or "OPAQUE").upper() == "BLEND":
+            flags1 |= _SLSF1_VERTEX_ALPHA
     if has_vertex_colors:
         flags2 |= 0x00000080  # SLSF2_Vertex_Colors
 
@@ -322,6 +325,8 @@ def _build_esp(name_idx: int, source_texture: str, spec: MaterialSpec,
     """
     flags1 = 0x80000000  # nif.xml Shader Flags 1 SK default (NI_BS_LT_FO4).
     flags2 = 0x00000020  # nif.xml Shader Flags 2 SK default; ZBuffer_Write stays off.
+    if (spec.alpha_mode or "OPAQUE").upper() == "BLEND":
+        flags1 |= _SLSF1_VERTEX_ALPHA
     if has_vertex_colors:
         flags2 |= 0x00000080  # Project contract: SLSF2_Vertex_Colors.
 
