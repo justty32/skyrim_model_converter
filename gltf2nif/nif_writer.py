@@ -7,8 +7,9 @@ tables and where each constant came from.
 
 Block plan:
     0                : NiNode (root; children = every shape; collision ref if hulls)
-    per shape (i)    : [NiAlphaProperty], BSTriShape, BSLightingShaderProperty,
-                       BSShaderTextureSet
+    per shape (i)    : [NiAlphaProperty], BSTriShape, then either
+                       BSLightingShaderProperty + BSShaderTextureSet, or
+                       BSEffectShaderProperty
                        (NiAlphaProperty only when a MaterialSpec asks for MASK/BLEND)
     collision (opt)  : bhkCollisionObject, bhkRigidBody, bhkListShape,
                        bhkConvexVerticesShape * N
@@ -311,6 +312,46 @@ def _build_lsp(name_idx: int, texset_ref: int, spec: MaterialSpec | None = None,
     return bytes(w.buf)          # 100 bytes
 
 
+def _build_esp(name_idx: int, source_texture: str, spec: MaterialSpec,
+               *, has_vertex_colors: bool = False) -> bytes:
+    """BSEffectShaderProperty for Skyrim SSE (NIF 20.2.0.7, BSVersion 100).
+
+    Field order and version gates below come directly from niftools/nifxml's
+    ``BSEffectShaderProperty`` declaration. BSVersion 100 uses only the Skyrim
+    fields (the BS>=130 and Fallout 4/76 fields are deliberately absent).
+    """
+    flags1 = 0x80000000  # nif.xml Shader Flags 1 SK default (NI_BS_LT_FO4).
+    flags2 = 0x00000020  # nif.xml Shader Flags 2 SK default; ZBuffer_Write stays off.
+    if has_vertex_colors:
+        flags2 |= 0x00000080  # Project contract: SLSF2_Vertex_Colors.
+
+    w = _Writer()
+    # Inherited BSShaderProperty/NiObjectNET prefix, same BSVersion-100 layout as LSP.
+    w.u32(name_idx)                 # NiObjectNET Name
+    w.u32(0xFFFFFFFF)               # inherited legacy Extra Data ref (-1)
+    w.u32(0x00000000)               # inherited legacy extra-data count/reserved
+    w.i32(-1)                       # Time Controller ref
+    w.u32(flags1)                   # nif.xml: Shader Flags 1 SK
+    w.u32(flags2)                   # nif.xml: Shader Flags 2 SK
+    w.f32(0.0); w.f32(0.0)          # nif.xml: UV Offset (TexCoord)
+    w.f32(1.0); w.f32(1.0)          # nif.xml: UV Scale default VEC2_ONE
+    w.sized_string(source_texture)  # nif.xml: Source Texture (SizedString)
+    w.u8(3)                         # nif.xml: Texture Clamp Mode default 3
+    w.u8(255)                       # nif.xml: Lighting Influence default 255
+    w.u8(0)                         # nif.xml: Env Map Min LOD
+    w.u8(0)                         # nif.xml: Unused Byte
+    w.f32(1.0)                      # nif.xml: Falloff Start Angle default 1
+    w.f32(1.0)                      # nif.xml: Falloff Stop Angle default 1
+    w.f32(1.0)                      # nif.xml: Falloff Start Opacity
+    w.f32(0.0)                      # nif.xml: Falloff Stop Opacity
+    for value in spec.base_color:
+        w.f32(_clamp01(float(value)))  # nif.xml: Base Color (Color4)
+    w.f32(float(spec.emissive_strength))  # nif.xml: Base Color Scale
+    w.f32(100.0)                    # nif.xml: Soft Falloff Depth default 100
+    w.sized_string("")             # nif.xml: Greyscale Texture (SizedString)
+    return bytes(w.buf)
+
+
 def _alpha_settings(spec: MaterialSpec | None) -> tuple[int, int] | None:
     """(NiAlphaProperty Flags, Threshold) for a spec, or None when no block is needed."""
     if spec is None:
@@ -539,16 +580,22 @@ def build_nif(meshes: list[Mesh], texprefix: str, normal_map_flags: list[bool],
             alpha_idx = len(blocks)
             blocks.append(("NiAlphaProperty", _build_alpha_property(0, alpha[0], alpha[1])))
         shape_idx = len(blocks)
-        lsp_idx = shape_idx + 1
-        texset_idx = shape_idx + 2
+        shader_idx = shape_idx + 1
         name_idx = len(strings)
         strings.append(m.name or f"shape_{shape_idx}")
         has_n = normal_map_flags[i] if normal_map_flags else False
-        blocks.append(("BSTriShape", _build_bstrishape(name_idx, lsp_idx, m, alpha_idx)))
-        blocks.append(("BSLightingShaderProperty", _build_lsp(
-            0, texset_idx, spec, has_vertex_colors=m.has_colors)))
-        blocks.append(("BSShaderTextureSet",
-                       _build_texset(_slot_paths(m, texprefix, has_n, spec))))
+        blocks.append(("BSTriShape", _build_bstrishape(name_idx, shader_idx, m, alpha_idx)))
+        if spec is not None and spec.shader_kind == "effect":
+            paths = _slot_paths(m, texprefix, has_n, spec)
+            source_texture = paths[0] if paths else ""
+            blocks.append(("BSEffectShaderProperty", _build_esp(
+                0, source_texture, spec, has_vertex_colors=m.has_colors)))
+        else:
+            texset_idx = shape_idx + 2
+            blocks.append(("BSLightingShaderProperty", _build_lsp(
+                0, texset_idx, spec, has_vertex_colors=m.has_colors)))
+            blocks.append(("BSShaderTextureSet",
+                           _build_texset(_slot_paths(m, texprefix, has_n, spec))))
         shape_refs.append(shape_idx)
 
     blocks[0] = ("BSFadeNode", _build_ninode(0, shape_refs, collision_ref,

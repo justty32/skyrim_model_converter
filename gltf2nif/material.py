@@ -51,6 +51,8 @@ class MaterialSpec:
     # Optional raw NiAlphaProperty overrides for callers with engine-tested values.
     alpha_flags_override: int | None = None
     alpha_threshold_override: int | None = None
+    # "effect" selects BSEffectShaderProperty; every other value uses lighting.
+    shader_kind: str = "lighting"
 
 
 def _clamp(value: float, lo: float, hi: float) -> float:
