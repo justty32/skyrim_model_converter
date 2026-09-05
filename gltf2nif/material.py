@@ -12,6 +12,16 @@ This module only *reads* glTF and produces `MaterialSpec` values. The actual
 byte emission lives in `nif_writer`. Nothing here is used unless the caller
 explicitly passes `material_specs=` to `build_nif`, so the historical
 (material-free) output is untouched.
+
+Port-specific controls are additive and default to the historical behaviour:
+`normal_texture_name` is an exact NIF path that overrides slot-1 name probing;
+`alpha_flags_override` and `alpha_threshold_override` accept engine-tested raw
+NiAlphaProperty values; and `shader_kind="effect"` selects an SSE
+BSEffectShaderProperty instead of the lighting property plus texture set. An
+empty normal name, None alpha overrides, and `shader_kind="lighting"` retain the
+old paths. BLEND automatically enables SLSF1_Vertex_Alpha. Vertex colours live
+on `geometry.Mesh`; when present, the writer selects the 32-byte vertex layout
+and enables the project-required SLSF2_Vertex_Colors flag.
 """
 
 from __future__ import annotations
