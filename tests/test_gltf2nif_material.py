@@ -249,6 +249,24 @@ def test_specular_slot_reaches_the_texture_set_bytes():
     assert plain != build_nif([_tri()], TEXPREFIX, [True])
 
 
+def test_explicit_normal_texture_name_overrides_probe_flag_and_derived_name():
+    explicit = r"textures\DsPort\tex\mywall_n__wet.dds"
+    spec = _spec(normal_texture_name=explicit)
+    slots = _slot_paths(_tri(), TEXPREFIX, False, spec)
+    assert slots[1] == explicit
+    data = build_nif([_tri()], TEXPREFIX, [False], material_specs=[spec])
+    assert explicit.encode() in data
+    assert b"textures\\dsport\\mywall_n.dds" not in data
+
+
+def test_empty_normal_texture_name_preserves_existing_slot_logic():
+    spec = _spec(normal_texture_name="")
+    assert _slot_paths(_tri(), TEXPREFIX, True, spec)[1] == (
+        r"textures\dsport\mywall_n.dds"
+    )
+    assert _slot_paths(_tri(), TEXPREFIX, False, spec)[1] == ""
+
+
 # ---------------------------------------------------------- NiAlphaProperty
 
 def _alpha_block(data: bytes) -> tuple[int, int]:

@@ -439,6 +439,8 @@ def _slot_paths(mesh: Mesh, texprefix: str, has_normal: bool,
     normal = f"{prefix}{base}_n.dds" if has_normal else ""
     if spec is None:
         return [diffuse, normal]
+    if spec.normal_texture_name:
+        normal = spec.normal_texture_name
     slots = [diffuse, normal] + [""] * 6  # slots 0..7 (slot8 is padded by _build_texset)
     if spec.has_emissive_map:
         slots[2] = f"{prefix}{base}_g.dds"

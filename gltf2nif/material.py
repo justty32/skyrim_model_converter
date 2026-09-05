@@ -46,6 +46,8 @@ class MaterialSpec:
     has_emissive_map: bool = False
     # KHR_materials_specular specularFactor (1.0 == "extension absent").
     specular_factor: float = 1.0
+    # Exact NIF texture path for slot 1. Empty preserves normal-map probing/fallback.
+    normal_texture_name: str = ""
 
 
 def _clamp(value: float, lo: float, hi: float) -> float:
