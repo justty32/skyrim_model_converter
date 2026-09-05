@@ -48,6 +48,9 @@ class MaterialSpec:
     specular_factor: float = 1.0
     # Exact NIF texture path for slot 1. Empty preserves normal-map probing/fallback.
     normal_texture_name: str = ""
+    # Optional raw NiAlphaProperty overrides for callers with engine-tested values.
+    alpha_flags_override: int | None = None
+    alpha_threshold_override: int | None = None
 
 
 def _clamp(value: float, lo: float, hi: float) -> float:

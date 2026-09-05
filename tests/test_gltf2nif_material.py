@@ -307,6 +307,27 @@ def test_mask_material_encodes_the_cutoff_as_the_threshold():
     assert _alpha_block(data2)[1] == 255
 
 
+def test_alpha_flags_and_threshold_can_use_dsport_overrides():
+    mask = _spec(
+        alpha_mode="MASK",
+        alpha_cutoff=0.1,
+        alpha_flags_override=4844,
+        alpha_threshold_override=128,
+    )
+    assert _alpha_block(
+        build_nif([_tri()], TEXPREFIX, [True], material_specs=[mask])
+    ) == (4844, 128)
+
+    blend = _spec(
+        alpha_mode="BLEND",
+        alpha_flags_override=237,
+        alpha_threshold_override=17,
+    )
+    assert _alpha_block(
+        build_nif([_tri()], TEXPREFIX, [True], material_specs=[blend])
+    ) == (237, 17)
+
+
 def test_opaque_material_emits_no_alpha_property_and_keeps_ref_minus_one():
     data = build_nif([_tri()], TEXPREFIX, [True], material_specs=[_spec()])
     assert "NiAlphaProperty" not in _header(data)["types"]

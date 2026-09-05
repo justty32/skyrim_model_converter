@@ -298,9 +298,18 @@ def _alpha_settings(spec: MaterialSpec | None) -> tuple[int, int] | None:
         return None
     mode = (spec.alpha_mode or "OPAQUE").upper()
     if mode == "BLEND":
-        return _ALPHA_FLAGS_BLEND, 0
+        flags = (_ALPHA_FLAGS_BLEND if spec.alpha_flags_override is None
+                 else int(spec.alpha_flags_override))
+        threshold = (0 if spec.alpha_threshold_override is None
+                     else int(spec.alpha_threshold_override))
+        return flags, threshold
     if mode == "MASK":
-        return _ALPHA_FLAGS_MASK, int(round(_clamp01(float(spec.alpha_cutoff)) * 255.0))
+        flags = (_ALPHA_FLAGS_MASK if spec.alpha_flags_override is None
+                 else int(spec.alpha_flags_override))
+        threshold = (int(round(_clamp01(float(spec.alpha_cutoff)) * 255.0))
+                     if spec.alpha_threshold_override is None
+                     else int(spec.alpha_threshold_override))
+        return flags, threshold
     return None
 
 
