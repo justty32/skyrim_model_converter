@@ -221,6 +221,9 @@ def read_gltf(path: str) -> list[Mesh]:
                 attribute_indices.append(attrs.NORMAL)
             if attrs.TEXCOORD_0 is not None:
                 attribute_indices.append(attrs.TEXCOORD_0)
+            color_index = getattr(attrs, "COLOR_0", None)
+            if color_index is not None:
+                attribute_indices.append(color_index)
             if any(index < 0 or index >= len(gltf.accessors) for index in attribute_indices):
                 raise GltfError(f"mesh {mi} primitive {pi} accessor is out of range")
             position_accessor = gltf.accessors[attrs.POSITION]
@@ -252,6 +255,29 @@ def read_gltf(path: str) -> list[Mesh]:
                        _read_accessor(gltf, buffers, attrs.TEXCOORD_0)]
                 if len(uvs) != len(positions):
                     raise GltfError(f"mesh {mi} primitive {pi} TEXCOORD_0 count differs from POSITION")
+            colors = []
+            if color_index is not None:
+                color_accessor = gltf.accessors[color_index]
+                valid_color = (
+                    color_accessor.type in ("VEC3", "VEC4")
+                    and (
+                        (color_accessor.componentType == 5126 and
+                         not color_accessor.normalized)
+                        or (color_accessor.componentType in (5121, 5123) and
+                            color_accessor.normalized)
+                    )
+                )
+                if not valid_color:
+                    raise GltfError(
+                        f"mesh {mi} primitive {pi} COLOR_0 has invalid components"
+                    )
+                raw_colors = _read_accessor(gltf, buffers, color_index)
+                colors = [tuple(map(float, color)) + ((1.0,) if len(color) == 3 else ())
+                          for color in raw_colors]
+                if len(colors) != len(positions):
+                    raise GltfError(
+                        f"mesh {mi} primitive {pi} COLOR_0 count differs from POSITION"
+                    )
             if prim.indices is not None:
                 if prim.indices < 0 or prim.indices >= len(gltf.accessors):
                     raise GltfError(f"mesh {mi} primitive {pi} indices accessor is out of range")
@@ -275,7 +301,8 @@ def read_gltf(path: str) -> list[Mesh]:
             node_name = node.name if node is not None else ""
             meshes.append(Mesh(
                 name=node_name or gmesh.name or f"mesh_{mi}_{pi}",
-                positions=positions, normals=normals, uvs=uvs, triangles=tris,
+                positions=positions, normals=normals, uvs=uvs, colors=colors,
+                triangles=tris,
                 material=_material_basename(gltf, prim),
                 material_index=_material_index(gltf, prim),
             ))

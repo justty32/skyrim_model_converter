@@ -53,6 +53,8 @@ class Mesh:
     # lets gltf2nif.material.specs_for_meshes align PBR specs with the node x primitive
     # walk order without replaying it. Purely informational - no effect on NIF bytes.
     material_index: int = -1
+    # Optional linear RGBA vertex colours. Appended/defaulted for byte compatibility.
+    colors: list[tuple[float, float, float, float]] = field(default_factory=list)
 
     @property
     def has_normals(self) -> bool:
@@ -61,6 +63,10 @@ class Mesh:
     @property
     def has_uvs(self) -> bool:
         return bool(self.positions) and len(self.uvs) == len(self.positions)
+
+    @property
+    def has_colors(self) -> bool:
+        return bool(self.positions) and len(self.colors) == len(self.positions)
 
 
 def face_normals(positions, triangles) -> list[tuple[float, float, float]]:

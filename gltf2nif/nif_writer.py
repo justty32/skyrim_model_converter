@@ -42,24 +42,35 @@ BS_VERSION = 100  # Skyrim Special Edition
 #     but WITHOUT the VF_FULLPREC(0x400) attribute bit — vanilla omits it and nif2gltf
 #     infers precision from the UV offset >= 12, so we omit it too for a byte match). ---
 _VF_VERTEX, _VF_UV, _VF_NORMALS, _VF_TANGENTS = 0x1, 0x2, 0x8, 0x10
+_VF_COLORS = 0x200
 _STRIDE = 28
 _UV_OFFSET, _NRM_OFFSET, _TAN_OFFSET = 16, 20, 24
 _ATTRS = _VF_VERTEX | _VF_UV | _VF_NORMALS | _VF_TANGENTS  # 0x1B
+_COLOR_OFFSET = 28
+_COLOR_STRIDE = 32
 
 
-def _vertex_desc() -> int:
+def _vertex_desc(has_colors: bool = False) -> int:
+    stride = _COLOR_STRIDE if has_colors else _STRIDE
+    attrs = _ATTRS | (_VF_COLORS if has_colors else 0)
     return (
-        (_STRIDE // 4) & 0xF
+        (stride // 4) & 0xF
         | ((_UV_OFFSET // 4) & 0xF) << 8
         | ((_NRM_OFFSET // 4) & 0xF) << 16
         | ((_TAN_OFFSET // 4) & 0xF) << 20
-        | (_ATTRS & 0xFFF) << 44
+        | (((_COLOR_OFFSET // 4) & 0xF) << 24 if has_colors else 0)
+        | (attrs & 0xFFF) << 44
     )
 
 
 def _nbyte(c: float) -> int:
     """Encode a [-1,1] normal component as a byte (inverse of nif2gltf byte/255*2-1)."""
     return max(0, min(255, round((c + 1.0) / 2.0 * 255.0)))
+
+
+def _ubyte01(c: float) -> int:
+    """Encode a clamped [0,1] colour component as an unsigned byte."""
+    return max(0, min(255, round(float(c) * 255.0)))
 
 
 # --- BSLightingShaderProperty defaults (opaque static, Default shader type -> 100-byte
@@ -198,10 +209,12 @@ def _build_bstrishape(name_idx: int, shader_ref: int, mesh: Mesh,
     w.i32(-1)                # Skin
     w.i32(shader_ref)        # Shader Property
     w.i32(alpha_ref)         # Alpha Property (-1 = none, the historical default)
-    w.u64(_vertex_desc())    # Vertex Desc
+    has_colors = mesh.has_colors
+    stride = _COLOR_STRIDE if has_colors else _STRIDE
+    w.u64(_vertex_desc(has_colors))  # Vertex Desc
     w.u16(len(mesh.triangles))  # Num Triangles (SSE ushort)
     w.u16(n)                 # Num Vertices
-    w.u32(_STRIDE * n + len(mesh.triangles) * 6)  # Data Size
+    w.u32(stride * n + len(mesh.triangles) * 6)  # Data Size
 
     for i in range(n):
         vx, vy, vz = sk_pos[i]
@@ -214,6 +227,9 @@ def _build_bstrishape(name_idx: int, shader_ref: int, mesh: Mesh,
         tx, ty, tz = tangents[i]
         w.u8(_nbyte(tx)); w.u8(_nbyte(ty)); w.u8(_nbyte(tz))  # @24 Tangent byte3
         w.u8(_nbyte(bitangents[i][2]))           # @27 Bitangent Z
+        if has_colors:
+            r, g, b, a = mesh.colors[i]
+            w.u8(_ubyte01(r)); w.u8(_ubyte01(g)); w.u8(_ubyte01(b)); w.u8(_ubyte01(a))
 
     for a, b, c in mesh.triangles:
         w.u16(a); w.u16(b); w.u16(c)
@@ -229,7 +245,8 @@ def _clamp01(v: float) -> float:
     return 0.0 if v < 0.0 else (1.0 if v > 1.0 else v)
 
 
-def _build_lsp(name_idx: int, texset_ref: int, spec: MaterialSpec | None = None) -> bytes:
+def _build_lsp(name_idx: int, texset_ref: int, spec: MaterialSpec | None = None,
+               *, has_vertex_colors: bool = False) -> bytes:
     """BSLightingShaderProperty (100 bytes, Default shader type).
 
     With `spec is None` every field is the historical constant, so the bytes are
@@ -268,6 +285,8 @@ def _build_lsp(name_idx: int, texset_ref: int, spec: MaterialSpec | None = None)
         # saves the specular pass. Anything else keeps the vanilla-static combo.
         if float(spec.metallic) == 0.0 and float(spec.roughness) >= 0.95:
             flags1 &= ~_SLSF1_SPECULAR
+    if has_vertex_colors:
+        flags2 |= 0x00000080  # SLSF2_Vertex_Colors
 
     w = _Writer()
     w.u32(name_idx)              # +0  Name
@@ -526,7 +545,8 @@ def build_nif(meshes: list[Mesh], texprefix: str, normal_map_flags: list[bool],
         strings.append(m.name or f"shape_{shape_idx}")
         has_n = normal_map_flags[i] if normal_map_flags else False
         blocks.append(("BSTriShape", _build_bstrishape(name_idx, lsp_idx, m, alpha_idx)))
-        blocks.append(("BSLightingShaderProperty", _build_lsp(0, texset_idx, spec)))
+        blocks.append(("BSLightingShaderProperty", _build_lsp(
+            0, texset_idx, spec, has_vertex_colors=m.has_colors)))
         blocks.append(("BSShaderTextureSet",
                        _build_texset(_slot_paths(m, texprefix, has_n, spec))))
         shape_refs.append(shape_idx)

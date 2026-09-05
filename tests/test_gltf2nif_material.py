@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import inspect
 import struct
+import base64
 
 import pytest
 
@@ -93,10 +94,11 @@ def test_build_nif_positional_signature_is_frozen():
     assert specs.default is None
 
 
-def test_mesh_material_index_is_appended_with_a_default():
+def test_mesh_additive_fields_are_appended_with_defaults():
     fields = list(Mesh.__dataclass_fields__)
-    assert fields[-1] == "material_index"
+    assert fields[-2:] == ["material_index", "colors"]
     assert Mesh().material_index == -1
+    assert Mesh().colors == []
 
 
 def test_omitting_specs_equals_none_equals_all_none_single_shape():
@@ -214,6 +216,55 @@ def test_specular_flag_drops_only_for_rough_dielectrics():
     for data in (rough, shiny, metal):
         assert not _lsp_u32(data, 16) & 0x1000
         assert not _lsp_u32(data, 16) & 0x8
+
+
+def test_vertex_colors_use_32_byte_vertices_and_enable_shader_flag():
+    mesh = _tri()
+    mesh.colors = [(1.0, 0.0, 0.5, 0.25), (0.0, 1.0, 0.0, 1.0),
+                   (0.0, 0.0, 1.0, 0.0)]
+    data = build_nif([mesh], TEXPREFIX, [True])
+    shape = _block_offsets(data, "BSTriShape")[0]
+    vertex_desc = struct.unpack_from("<Q", data, shape + 100)[0]
+    assert (vertex_desc & 0xF) * 4 == 32
+    assert (vertex_desc >> 44) & 0x200
+    assert ((vertex_desc >> 24) & 0xF) * 4 == 28
+    assert data[shape + 116 + 28:shape + 116 + 32] == bytes((255, 0, 128, 64))
+    assert _lsp_u32(data, 20) & 0x80
+
+
+def test_gltf_reader_accepts_normalized_unsigned_byte_color_0(tmp_path):
+    from pygltflib import (
+        Accessor, Asset, Attributes, Buffer, BufferView, GLTF2,
+        Mesh as GltfMesh, Node, Primitive, Scene,
+    )
+    from gltf2nif.gltf_reader import read_gltf
+
+    positions = struct.pack("<9f", 0, 0, 0, 1, 0, 0, 0, 1, 0)
+    colors = bytes((255, 0, 128, 64, 0, 255, 0, 255, 0, 0, 255, 0))
+    indices = struct.pack("<3H", 0, 1, 2)
+    blob = positions + colors + indices
+    uri = "data:application/octet-stream;base64," + base64.b64encode(blob).decode()
+    gltf = GLTF2(
+        asset=Asset(version="2.0"), buffers=[Buffer(byteLength=len(blob), uri=uri)],
+        bufferViews=[BufferView(buffer=0, byteOffset=0, byteLength=len(positions)),
+                     BufferView(buffer=0, byteOffset=len(positions), byteLength=len(colors)),
+                     BufferView(buffer=0, byteOffset=len(positions) + len(colors),
+                                byteLength=len(indices))],
+        accessors=[Accessor(bufferView=0, componentType=5126, count=3, type="VEC3"),
+                   Accessor(bufferView=1, componentType=5121, normalized=True,
+                            count=3, type="VEC4"),
+                   Accessor(bufferView=2, componentType=5123, count=3, type="SCALAR")],
+        meshes=[GltfMesh(primitives=[Primitive(
+            attributes=Attributes(POSITION=0, COLOR_0=1), indices=2)])],
+        nodes=[Node(mesh=0)], scenes=[Scene(nodes=[0])], scene=0,
+    )
+    path = tmp_path / "colors.gltf"
+    gltf.save_json(str(path))
+
+    mesh = read_gltf(str(path))[0]
+    assert mesh.colors[0] == pytest.approx((1.0, 0.0, 128 / 255, 64 / 255))
+    assert mesh.colors[1] == pytest.approx((0.0, 1.0, 0.0, 1.0))
+    assert mesh.has_colors
 
 
 # ------------------------------------------------------------- texture slots
