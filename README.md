@@ -4,7 +4,7 @@
 
 > **獨立 repo**（2026-08-02 自 ModForge `sub_projs/model-converter` 抽出，未帶舊 commit 歷史）。文中 `../ModForge/…`、`../godot-worldspace-editor/…` 這類連結，前提是各 repo **同層 clone 在同一個父目錄下**（本機為 `~/repo/moddings/skyrim/projects/`）。
 
-**一句話**：以 Skyrim **`.nif`（含 `.dds` 紋理）** 為中心，做與 **Godot 可用格式（glTF）** 及 **各種常用模型格式（FBX / OBJ / glTF）** 的**雙向**互轉工具。定位是 ModForge 生態的**基石工具**——不整合進 ModForge，靠協議/CLI 被消費。
+**一句話**：以 Skyrim **`.nif`（含 `.dds` 紋理）** 為中心，做與 **Godot 可用格式（glTF）** 及 **各種常用模型格式（FBX / OBJ / glTF）** 的**雙向**互轉工具；正向路已由 `any2nif` + `tex2dds` 實作。定位是 ModForge 生態的**基石工具**——不整合進 ModForge，靠協議/CLI 被消費。
 
 **為什麼開這個工具**：兩個消費需求撞在一起，且現有家底都是半套——
 - **worldspace 物件編輯**（[godot-worldspace-editor](../godot-worldspace-editor/README.md)）要把 vanilla `.nif` → glTF 丟進 Godot 當視覺代理（**反向**，純預覽）。
@@ -52,7 +52,7 @@ MVP 已改自寫純 Python 後端（見下「實作」節），不再依賴外�
 
 **格式來源**：niftools/nifxml `nif.xml`（逐欄查證，非憑記憶；reference 檔 gitignore）。
 **跑**：`python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt`，然後 `python -m nif2gltf --in foo.nif --out foo.gltf --flat`。
-**測**：`.venv/Scripts/python -m pytest`（**68 綠**：nif2gltf 正向 26 [glTF writer round-trip 8 / NIF reader LE+SSE 合成 fixture 10 / CLI 契約 8] + gltf2nif 反向 42）。
+**測**：`.venv/Scripts/python -m pytest`（**202 passed**，2026-09-05 實跑）。
 跨 repo live consumer 測試在同層
 `../godot-worldspace-editor/tests/test_model_fetch_contract.py`：production CLI 的 synthetic
 NIF `.gltf + .bin` 會由 Godot 4.6 production `ModelFetch._load_gltf()` 真正載入，並驗
@@ -72,10 +72,36 @@ python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--coll
 - **碰撞** `--collision` hulls JSON → `bhkCollisionObject→bhkRigidBody→bhkListShape→bhkConvexVerticesShape`（Havok 公尺、不乘 70；STATIC/STONE/MOTION_FIXED）
 - 服務 [darksouls-port](../ModForge/sub_projs/darksouls-port/plan.md) 的 `FLVER→glTF→NIF` 管線；m0046B1A18 實件已跑（5 shape / 1684 tri / 64 KB，round-trip 位置誤差 ~1.7e-6 m）。
 
+## 實作（`any2nif/` — 正向入口）
+
+所有來源先正規化成 glTF/GLB，再交給既有 `gltf2nif` 寫 SSE `.nif`；完整 CLI 契約見 [PROTOCOL.md](PROTOCOL.md#正向入口any2nif)。
+
+| 模組 | 職責 |
+|---|---|
+| `any2nif/cli.py` | CLI 編排：單位／軸向、貼圖、碰撞、PBR 材質與 NIF 寫出；exit 0/1/2/3。 |
+| `any2nif/normalize.py` | 依副檔名分派：glTF/GLB 直通，OBJ/STL/PLY/DAE/ZAE/OFF/DXF/XYZ 走 trimesh，FBX 走 FBX2glTF。 |
+| `any2nif/trimesh_backend.py`、`fbx_backend.py` | 將非 glTF 來源正規化成 GLB，保留可用的 mesh／material 資訊。 |
+| `any2nif/transform.py` | 將來源單位換算成公尺，並把來源 Z-up 正規化成 glTF Y-up。 |
+| `any2nif/textures.py` | glTF 圖像轉 Skyrim diffuse／normal／specular `.dds` 槽位。 |
+
+## 實作（`tex2dds/` — 貼圖編碼）
+
+純 Python 將 Pillow 可解碼影像寫成 Skyrim 可用 BC1/BC3 DDS；完整 CLI 契約見 [PROTOCOL.md](PROTOCOL.md#貼圖編碼tex2dds)。
+
+| 模組 | 職責 |
+|---|---|
+| `tex2dds/cli.py` | 單檔轉換 CLI 與 exit 0/1/2。 |
+| `tex2dds/pipeline.py` | 解碼、pow2 resize、normal green flip、mipmap chain 與格式選擇。 |
+| `tex2dds/bcn.py` | 純 Python BC1／BC3 block encoder。 |
+| `tex2dds/dds.py` | 寫入 DXT1／DXT5 DDS header 與 mip payload。 |
+
 ## Open
 
 - **反向產出實機驗證**（**待主力機**）：`gltf2nif` 輸出的 `.nif`（含碰撞）進遊戲測試 cell，確認看得到、站得上去。離線 round-trip + 對 vanilla byte 核已過，剩實機 acceptance。
 - **對真實 vanilla `.nif` 驗證載體**（MVP 收尾，**待主力機**）：跑 `nif2gltf` 轉真實 vanilla mesh（LE 與 SSE 各取樣），確認 glTF 進 Godot/Blender 形狀對；SSE 半精度 offset 解碼是最需驗的點。見 WAIT_USER。
 - ~~**批量 nif→glTF 的可行載體**~~ ✅ 自寫 `nif2gltf`（上節），不再卡 NifSkope。
 - ~~**協議形狀**~~ ✅ 草案 2026-06-17 [PROTOCOL.md](PROTOCOL.md)：掛勾 `MODFORGE_NIF2GLTF_BIN`（黑盒 exec）、單檔 `--in/--out/--flat`、批量 `manifest.json`、exit code。**參考後端＝本 repo 的 `nif2gltf`**（wrapper 呼 `python -m nif2gltf`）；契約 backend-agnostic，要換後端不動契約。
-- **與 model-porting 的邊界**：正向內容留在 model-porting、本 repo 只放工具實作與反向？還是把 model-porting 的 runbook 也收斂進來？（MVP 不碰正向，此邊界 MVP 後再定。）
+- ~~**與 model-porting 的邊界**~~ ✅ 選型細節留在 model-porting／[AUDIT.md](AUDIT.md)，本 repo 收斂可執行的正反向工具與 CLI 契約。
+- **`.3ds`**：trimesh 不支援；assimp 需要 sudo 安裝，本輪無法採用。
+- **蒙皮／骨架**：`gltf2nif` 明確拒絕帶 skin／動畫的輸入，現階段只支援靜態 mesh。
+- **BC7**：未實作；目前 `tex2dds` 的 BC1／BC3 已足以覆蓋本輪需求。

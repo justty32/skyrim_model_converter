@@ -116,6 +116,59 @@ gltf2nif <in.gltf> <out.nif> [--texprefix <textures\prefix>] [--collision <hulls
 
 **驗證保證**：輸出可被本 repo 的 `nif2gltf` parser 讀回，三角形/頂點座標（誤差容忍內）/UV/貼圖路徑與輸入一致；每個位元組佈局對過真實 vanilla SSE nif。契約 backend-agnostic。
 
+## 正向入口：`any2nif`
+
+```text
+usage: any2nif [-h] [--textures-out DIR] [--texprefix TEXPREFIX] [--scale SCALE] [--unit UNIT] [--up-axis {y,z}] [--collision COLLISION] [--root-name ROOT_NAME] [--fbx2gltf FBX2GLTF] [--no-materials] [--keep-intermediate DIR] in_path out_path
+```
+
+| 旗標 | 必填 | 語意 |
+|---|---|---|
+| `in_path` | ✅ | 來源模型：`.dae/.dxf/.fbx/.glb/.gltf/.obj/.off/.ply/.stl/.xyz/.zae`。glTF/GLB 直通，其餘先正規化成 GLB。 |
+| `out_path` | ✅ | 目標 SSE `.nif`。 |
+| `--textures-out DIR` | | 將來源貼圖寫成 BC1/BC3 + mipmaps 的 `.dds` 到 DIR。 |
+| `--texprefix TEXPREFIX` | | 寫入 NIF 的遊戲內貼圖路徑前綴；預設 `textures\any2nif`。 |
+| `--scale SCALE` | | 額外套用的均勻座標縮放；與 `--unit` 相乘。 |
+| `--unit UNIT` | | 來源單位；`m`（預設）、`cm`、`mm`、`in`、`ft`，先換算成公尺。 |
+| `--up-axis {y,z}` | | 來源檔的 up axis；預設 `y`，`z` 會轉成 glTF Y-up。 |
+| `--collision COLLISION` | | hulls JSON → `bhkConvexVerticesShape` 碰撞。 |
+| `--root-name ROOT_NAME` | | 根 `NiNode` 名；預設 `Scene Root`。 |
+| `--fbx2gltf FBX2GLTF` | | FBX 輸入專用的 FBX2glTF binary 路徑。 |
+| `--no-materials` | | 忽略來源 PBR 材質值，使用 `gltf2nif` 靜態預設值。 |
+| `--keep-intermediate DIR` | | 將正規化的 glTF/GLB 留在 DIR，不使用即棄暫存目錄。 |
+
+| exit code | 意義 |
+|---|---|
+| 0 | 成功，`out_path` 已寫。 |
+| 1 | 一般錯誤（來源不存在、單位／相依／貼圖／碰撞／寫檔失敗）。 |
+| 2 | 來源格式或 glTF 解析失敗；`argparse` 命令列用法錯誤亦回傳 2。 |
+| 3 | 來源含 skin、morph 或動畫，靜態後端拒絕。 |
+
+**輸出保證**：成功時產出 Skyrim SSE `.nif`；來源先統一為 glTF Y-up／公尺，再由 `gltf2nif` 轉成 Skyrim Z-up units。每個 glTF primitive 對應一個 `BSTriShape`；指定 `--textures-out` 時另寫來源可解出的 diffuse／normal／specular DDS，指定 `--keep-intermediate` 時保留正規化結果。
+
+## 貼圖編碼：`tex2dds`
+
+```text
+usage: tex2dds [-h] [--format {auto,bc1,bc3}] [--no-mipmaps] [--normal-map] [--resize {pow2,none}] in_path out_path
+```
+
+| 旗標 | 必填 | 語意 |
+|---|---|---|
+| `in_path` | ✅ | 來源影像：PNG/JPG/JPEG/TGA/BMP/DDS。 |
+| `out_path` | ✅ | 目標 `.dds`。 |
+| `--format {auto,bc1,bc3}` | | 預設 `auto`：有實際透明度選 BC3，否則選 BC1。 |
+| `--no-mipmaps` | | 只寫 base level；預設產生直到 1×1 的完整 mip chain。 |
+| `--normal-map` | | Skyrim `_n`：翻轉綠色通道到 DirectX 慣例、保留 alpha 作 glossiness，並強制 BC3。 |
+| `--resize {pow2,none}` | | 預設 `pow2`，縮放到最近的 2 次方；`none` 保留來源尺寸。 |
+
+| exit code | 意義 |
+|---|---|
+| 0 | 成功，`out_path` 已寫。 |
+| 1 | 一般錯誤（命令列用法、來源不存在、選項或寫檔失敗）。 |
+| 2 | Pillow 無法解析來源影像。 |
+
+**輸出保證**：成功時產出 FourCC `DXT1`（BC1）或 `DXT5`（BC3）的 DDS；預設為 pow2 尺寸與完整 mip chain。小於 4×4 的 block 以邊緣像素補齊，DDS header 仍保留該 mip 的真實尺寸。
+
 ## 與 ModForge `package` 的關係
 
 nif→glTF 是**反向**（純預覽代理）；glTF→nif（`gltf2nif`，上節）是**移植方向**，產出的 `.nif`+`.dds` 進 ModForge spec 的 `assets/`，由 `package`（`StaticSpec.Model`）打包。正向（一般外部→nif）決策真相在 [model-porting/](../ModForge/workflows/idea/asset-pipelines/model-porting/README.md)。

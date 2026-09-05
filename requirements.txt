@@ -1,5 +1,14 @@
-# nif2gltf runtime + test deps. Install into a local venv (gitignored):
-#   python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt
-pygltflib>=1.16
-pytest>=8.0
-numpy>=1.26
+# Core
+numpy>=2.4.6
+pygltflib>=1.16.5
+
+# Forward optional (OBJ/STL/PLY/DAE)
+trimesh>=5.0.0
+pycollada>=0.9.3
+# FBX needs the external FBX2glTF binary from tools/fetch_fbx2gltf.sh; it is not a pip dependency.
+
+# Textures
+Pillow>=12.3.0
+
+# Tests
+pytest>=9.1.0
