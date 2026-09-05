@@ -13,3 +13,4 @@ backend/
 *.gltf
 *.bin
 !tests/**/*.gltf
+tools/bin/
