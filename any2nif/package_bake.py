@@ -89,7 +89,13 @@ def _needs_bake(gltf, material):
     # The NIF writer has no per-texture sampler controls. Bake non-default
     # sampling even when every slot shares the same UV set and transform.
     sampling = [_sampling(gltf, info) for _, info in infos]
-    return (len(set(mappings)) > 1 or material.occlusionTexture is not None or
+    normal_transform = False
+    if material.normalTexture is not None:
+        _, _, scale, rotation = _mapping(material.normalTexture, 'normalTexture')
+        if scale[0] == 0 or scale[1] == 0:
+            raise AnyError('normal texture UV transform requires nonzero scale', code=2)
+        normal_transform = rotation != 0 or scale[0] < 0 or scale[0] != scale[1]
+    return (normal_transform or len(set(mappings)) > 1 or material.occlusionTexture is not None or
             any(s['wrap_s'] != 10497 or s['wrap_t'] != 10497 or not s['linear']
                 for s in sampling))
 

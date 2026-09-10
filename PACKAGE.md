@@ -46,11 +46,11 @@ diffuse 輸出 BC1／BC3；normal 會先將 `normalTexture.scale` 烘進法線�
 
 整包支援替代 `TEXCOORD_n`，以及 `KHR_texture_transform` 的位移、旋轉、縮放與 `texCoord` 覆寫。各貼圖共用座標集與變換時，轉換器會把結果直接烘進 NIF 的單一 UV，原始模型不變。變換順序依 [Khronos 規格](https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_texture_transform)：先縮放、再旋轉、最後位移。支援 float 與正規化 unsigned byte／short UV；缺少指定座標、非有限值或超出 NIF 半精度範圍會拒絕。
 
-共用 UV 直接烘座標時，帶 normal 的變換限正值等比縮放與位移，以保留切線方向；旋轉、鏡射、不等比／零縮放仍拒絕。不同貼圖各用不同座標時，改走下方的貼圖重烘流程。這些新支援只作用於 `--package`；單檔模式的後端仍讀 TEXCOORD_0。只靠 image-source extension、沒有一般 `texture.source` 的材質也仍報錯。
+共用 UV 帶 normal 時，正值等比縮放與位移可直接烘進座標；旋轉、鏡射或不等比縮放會自動走下方的貼圖重烘，換算法線方向。normal 的 UV 零縮放會拒絕，因為無法確定完整切線方向。不同貼圖各用不同座標時，同樣改走貼圖重烘流程。這些新支援只作用於 `--package`；單檔模式的後端仍讀 TEXCOORD_0。只靠 image-source extension、沒有一般 `texture.source` 的材質也仍報錯。
 
 ### 不同貼圖使用不同 UV
 
-`--package` 遇到各貼圖的座標集／變換不同、帶 AO 陰影圖，或 sampler 使用邊緣延伸／鏡射重複／nearest 時，會自動用 [xatlas](https://github.com/mworchel/xatlas-python) 排出沒有重疊的共用 UV，再把各張圖按原本 UV 重採樣。每個來源 primitive／擺放實例各有自己的材質與貼圖；UV 接縫增加頂點，但保持三角形的位置、順序、法線與頂點色。node 的位移／旋轉／縮放先套進幾何，避免不同擺放共用錯誤的法線烘焙。
+`--package` 遇到各貼圖的座標集／變換不同、帶 AO 陰影圖、normal 的 UV 有旋轉／鏡射／不等比縮放，或 sampler 使用邊緣延伸／鏡射重複／nearest 時，會自動用 [xatlas](https://github.com/mworchel/xatlas-python) 排出沒有重疊的共用 UV，再把各張圖按原本 UV 重採樣。每個來源 primitive／擺放實例各有自己的材質與貼圖；UV 接縫增加頂點，但保持三角形的位置、順序、法線與頂點色。node 的位移／旋轉／縮放先套進幾何，避免不同擺放共用錯誤的法線烘焙。
 
 預設每張烘焙圖是 1024 × 1024；想保留更多布紋細節可提高尺寸：
 
@@ -62,7 +62,7 @@ python -m any2nif SheenChair.glb output/SheenChair --package --collision convex-
 
 採樣支援 REPEAT、MIRRORED_REPEAT、CLAMP_TO_EDGE，以及 nearest／bilinear；共用 UV 的非預設 sampler 也會自動重烘，無效 sampler 索引／wrap／filter 會拒絕。RGB 色圖在線性空間取樣，normal、roughness、AO 等資料圖不做 sRGB 轉換。烘焙以來源最高解析度取樣，未模擬視角相關的來源 mip／anisotropic 濾波。Atlas 預留外圈供小區塊補救，未覆蓋區域補最近的邊緣顏色，再交給既有 DDS 完整 mipmap 流程。4096 的四槽合成模型完整試轉約 89 秒、峰值記憶體約 1.52 GiB（本次 WSL 實測，非所有模型的上限）。
 
-AO 使用紅色通道與 `strength`，乘進線性 diffuse，之後再套 diffuse RGB factor；alpha 不乘 AO。這是傳統 Skyrim 的陰影近似，會讓直接光照也變暗，並非 glTF 的環境光遮蔽等價實作。normal 會先套強度，再按原 UV 與新 UV 的切線方向換算；有來源 tangent 時保留其方向與 handedness，再依 UV 變換換算；沒有時使用平滑切線近似，並非 MikkTSpace。有來源 tangent 的 normal 變換需要可逆的 UV 縮放。超過 NIF 頂點上限的模型依實際切分後的切線方向烘焙。負 `--scale` 另補償法線 Y 方向。Sheen 與材質 variants 仍不轉成 Skyrim 對等效果，使用來源預設材質。
+AO 使用紅色通道與 `strength`，乘進線性 diffuse，之後再套 diffuse RGB factor；alpha 不乘 AO。這是傳統 Skyrim 的陰影近似，會讓直接光照也變暗，並非 glTF 的環境光遮蔽等價實作。normal 會先套強度，再按原 UV 與新 UV 的切線方向換算；有來源 tangent 時保留其方向與 handedness，再依 UV 變換換算；沒有時使用平滑切線近似，並非 MikkTSpace。normal 變換需要可逆的 UV 縮放。超過 NIF 頂點上限的模型依實際切分後的切線方向烘焙。負 `--scale` 另補償法線 Y 方向。Sheen 與材質 variants 仍不轉成 Skyrim 對等效果，使用來源預設材質。
 
 公開真實模型的固定版本、試轉結果與可重跑指令見 [REAL-ASSETS.md](REAL-ASSETS.md)。
 

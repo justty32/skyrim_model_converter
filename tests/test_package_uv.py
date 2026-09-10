@@ -70,19 +70,21 @@ def test_override_and_shared_normal_mapping(tmp_path):
 
 
 @pytest.mark.parametrize("transform,normal", [
-    ({"scale": [1, 2]}, True), ({"rotation": .5}, True),
-    ({"scale": [-1, -1]}, True), ({"offset": [float("nan"), 0]}, False),
+    ({"scale": [0, 1]}, True), ({"scale": [1, 0]}, True),
+    ({"scale": [0, 0]}, True), ({"offset": [float("nan"), 0]}, False),
     ({"scale": [1]}, False), ({"rotation": "bad"}, False),
     ({"texCoord": -1}, False), ({"texCoord": True}, False),
     ({"offset": [1e10, 0]}, False),
 ])
-def test_bad_mapping_keeps_existing_package(tmp_path, transform, normal):
+def test_bad_mapping_keeps_existing_package(tmp_path, capsys, transform, normal):
     source, doc = _source(tmp_path, {})
     output = tmp_path / "Data"
     assert main([str(source), str(output), "--package"]) == 0
     before = {p.relative_to(output): p.read_bytes() for p in output.rglob("*") if p.is_file()}
     source, _ = _source(tmp_path, transform, normal=normal)
     assert main([str(source), str(output), "--package"]) == 2
+    if normal:
+        assert "normal texture UV transform requires nonzero scale" in capsys.readouterr().err
     assert before == {p.relative_to(output): p.read_bytes() for p in output.rglob("*") if p.is_file()}
 
 

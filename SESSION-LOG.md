@@ -4,6 +4,8 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 ## 現役狀態
 
+2026-09-10 共用 UV 的 normal 變換已完成：旋轉、鏡射、不等比縮放自動重烘；零縮放明確拒絕且保留舊包。15 組實際 NIF／DDS 法線方向測試通過（含來源提供／未提供 tangent）；shared 測試移除 AO 干擾，恢復舊路由的反例讓全部 10 組 shared cases 失敗。SheenChair 等四個真實模型試轉再次通過。
+
 2026-09-10 共用 UV 的 sampler 相容性已完成：邊緣延伸、鏡射重複與 nearest 放大採樣自動路由貼圖重烘；無效 sampler 索引／wrap／filter 明確拒絕並保留舊成品。新增 11 個實際 DDS／NIF 測試，一般 REPEAT＋linear 保持原 UV。完整 suite 與四個真實模型案例通過，SheenChair 顏色誤差與下列紀錄一致。
 
 2026-09-10 跨 UV 重烘已完成：不同槽的座標／變換自動排成逐 primitive／實例獨立 atlas，支援 wrap／採樣、線性 diffuse × AO、normal 切線換算及負縮放；`--bake-size` 64～4096，預設 1024。所有面皆檢查像素覆蓋，極細面配置獨立小區塊；沒有安全空間就要求提高尺寸並保留舊成品。新增 xatlas 0.0.11，僅裝專案 `.venv-wsl`。
@@ -12,7 +14,7 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 4096 四槽合成模型完整 CLI 試轉 exit 0，約 89 秒、峰值 RSS 1,595,832 KiB（約 1.52 GiB）；烘焙逐槽／分塊處理，不把所有槽的浮點 atlas 同時常駐。來源／成品留忽略的 `backend/bake-memory/`。
 
-2026-09-10 真實模型與 UV 續行已完成：整包支援替代 UV、共用 KHR_texture_transform 的位移／旋轉／縮放／texCoord 覆寫，烘進單一 NIF UV。帶 normal 時限正值等比縮放與位移；當時不同槽的 UV 對應仍拒絕，現已由上述重烘補上。新增 25 個測試，實際讀回 NIF 座標、normal DDS 引用並驗失敗保護。
+2026-09-10 真實模型與 UV 續行已完成：整包支援替代 UV、共用 KHR_texture_transform 的位移／旋轉／縮放／texCoord 覆寫，烘進單一 NIF UV。當時帶 normal 時限正值等比縮放與位移，不同槽的 UV 對應也仍拒絕；這些限制現已由重烘補上，normal 零縮放仍拒絕。新增 25 個測試，實際讀回 NIF 座標、normal DDS 引用並驗失敗保護。
 
 公開模型試轉與來源見 [REAL-ASSETS.md](REAL-ASSETS.md)：Lantern、Avocado 原版與 LanternUV 衍生版通過；SheenChair 原先因混合 UV 拒絕，現已成功試轉。`tools/smoke_real_assets.py` 固定來源版本與 SHA-256，素材／產物留忽略的 `backend/real-assets/`。整支腳本已實跑通過，包含三角形／位置／UV 讀回；尚無遊戲畫面驗收。
 
@@ -24,10 +26,10 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 本次獨立 WSL 環境在 `.venv-wsl`，由既有 uv 建立；FBX2glTF 在忽略的 `tools/bin/`。Windows `.venv` 保留。使用者已授權專案內安裝依賴與 push。
 
-驗證：`.venv-wsl/bin/python -m pytest -q --disable-warnings` → **425 passed、零 skipped**；包含真 FBX2glTF、跨格式完整 Data 目錄、所有 DDS 槽位、65535 頂點切分、負縮放、錯誤資料與發布／回復。仍有既有套件的 deprecation warnings。
+驗證：`.venv-wsl/bin/python -m pytest -q --disable-warnings` → **437 passed、零 skipped**；包含真 FBX2glTF、跨格式完整 Data 目錄、所有 DDS 槽位、65535 頂點切分、負縮放、錯誤資料與發布／回復。仍有既有套件的 deprecation warnings。
 
 跨 repo darksouls-port live contract 另行嘗試，但其 `initial_state.py` import 缺少 soulstruct，未能開始執行；本輪未改 darksouls-port 或裸 `gltf2nif` writer，不能把本 repo 測試當成該跨 repo 測試已通過。
 
 ## 後續方向
 
-跨 UV 重烘已完成；共用 UV 直通模式仍限制 normal 旋轉／鏡射。共用 UV 的非 REPEAT／nearest sampler 已路由重烘。True PBR、反向貼圖、蒙皮／動畫、凹形碰撞自動拆分與 ModForge spec 的黑盒接線仍是另外的工作。本輪不宣稱這些已完成；舊 idea 的入口已改標目前實作與歷史方案。
+跨 UV 重烘已完成；共用 UV 的 normal 旋轉／鏡射／不等比縮放也已路由重烘，零縮放仍拒絕。共用 UV 的非 REPEAT／nearest sampler 已路由重烘。True PBR、反向貼圖、蒙皮／動畫、凹形碰撞自動拆分與 ModForge spec 的黑盒接線仍是另外的工作。本輪不宣稱這些已完成；舊 idea 的入口已改標目前實作與歷史方案。
