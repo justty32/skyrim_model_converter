@@ -29,11 +29,13 @@ python -m any2nif chair.glb output/Chair --package
 
 diffuse 的 RGB 顏色倍率會在線性色彩空間乘上原圖，再轉回 sRGB。沒有 diffuse 的材質會產生純色圖；沒有材質的 primitive 使用白色圖。Alpha 倍率保留給 NIF 材質，避免在貼圖和材質各乘一次。
 
-diffuse 輸出 BC1／BC3；normal 使用 BC3 並翻轉綠色通道；specular 與 emissive 輸出 BC1。全部生成二次方尺寸與完整 mipmap。輸出後重新讀取 NIF 的 `BSShaderTextureSet`，逐一核對檔案存在、DDS 編碼、完整 mip 資料長度，並由 Pillow 解碼。
+diffuse 輸出 BC1／BC3；normal 會先將 `normalTexture.scale` 烘進法線的 X／Y 分量並重新正規化，再使用 BC3 並翻轉綠色通道；specular 與 emissive 輸出 BC1。全部生成二次方尺寸與完整 mipmap。輸出後重新讀取 NIF 的 `BSShaderTextureSet`，逐一核對檔案存在、DDS 編碼、完整 mip 資料長度，並由 Pillow 解碼。
 
 傳統 Skyrim 材質不是完整 PBR。Metallic／roughness 以既有公式近似，roughness 影像反相為 specular mask；`KHR_materials_specular` 有提供時優先採用。True PBR、材質的完全等價轉換與凹形碰撞自動拆分仍未實作。骨架、動畫、morph 與 sparse accessor 沿用靜態後端的拒絕規則。
 
-目前只支援 TEXCOORD_0 與未變換的貼圖座標。非預設 UV 集、非 identity 的 `KHR_texture_transform` 或無法處理的 normal scale 會明確報錯；只靠 image-source extension、沒有一般 `texture.source` 的材質也會報錯。不要將 metadata 還在輸入裡，當成輸出已支援該功能。
+法線強度支援 0（消除傾斜）、介於 0 與 1（減弱）、大於 1（加強）及負值（反轉 X／Y）；NaN／Infinity 會報錯。計算依 [glTF normalTexture.scale 定義](https://raw.githubusercontent.com/KhronosGroup/glTF/main/specification/2.0/schema/material.normalTextureInfo.schema.json)，在壓縮前烘焙，因此仍有 DDS 壓縮與濾波誤差。
+
+目前只支援 TEXCOORD_0 與未變換的貼圖座標。非預設 UV 集、非 identity 的 `KHR_texture_transform` 會明確報錯；只靠 image-source extension、沒有一般 `texture.source` 的材質也會報錯。不要將 metadata 還在輸入裡，當成輸出已支援該功能。
 
 ## 重跑與失敗
 

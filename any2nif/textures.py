@@ -120,6 +120,35 @@ def _tex_index(holder, attr: str):
     return getattr(info, "index", None) if info is not None else None
 
 
+def _normal_source(gltf, material, buffers, gltf_dir) -> np.ndarray | None:
+    """Bake glTF normalTexture.scale before tex2dds performs the green flip.
+
+    Formula: glTF 2.0 schema/material.normalTextureInfo.schema.json, scale.
+    Scale tangent-space X/Y and normalize; never apply an sRGB transfer.
+    """
+    info = material.normalTexture
+    rgba = _texture_image(gltf, buffers, gltf_dir, _tex_index(material, "normalTexture"))
+    if rgba is None:
+        return None
+    scale = getattr(info, "scale", None)
+    scale = 1.0 if scale is None else scale
+    if isinstance(scale, bool) or not isinstance(scale, (int, float)) or not np.isfinite(scale):
+        raise ValueError("normalTexture scale must be a finite number")
+    if scale == 1.0:
+        return rgba
+    normal = rgba[:, :, :3].astype(np.float64) * (2.0 / 255.0) - 1.0
+    # A common factor cancels during normalization. Divide first so even very
+    # large finite scales cannot overflow the length calculation.
+    divisor = max(1.0, abs(scale))
+    normal[:, :, :2] *= scale / divisor
+    normal[:, :, 2] /= divisor
+    length = np.hypot(np.hypot(normal[:, :, 0], normal[:, :, 1]), normal[:, :, 2])
+    normal /= length[:, :, None]
+    result = rgba.copy()
+    result[:, :, :3] = np.clip(np.rint((normal + 1.0) * 127.5), 0, 255).astype(np.uint8)
+    return result
+
+
 def _specular_source(gltf, material, buffers, gltf_dir) -> np.ndarray | None:
     """Grey specular mask for the `_s` slot, replicated across RGB. See module docstring."""
     ext = (getattr(material, "extensions", None) or {}).get(_SPECULAR_EXT) or {}
@@ -180,7 +209,7 @@ def export_textures(gltf_path: str, out_dir: str, *, codec: str = "auto") -> dic
              _texture_image(gltf, buffers, gltf_dir, _tex_index(pbr, "baseColorTexture")),
              {"fmt": codec}),
             ("normal", f"{base}_n.dds",
-             _texture_image(gltf, buffers, gltf_dir, _tex_index(material, "normalTexture")),
+             _normal_source(gltf, material, buffers, gltf_dir),
              {"fmt": "bc3", "normal_map": True}),
             ("specular", f"{base}_s.dds",
              _specular_source(gltf, material, buffers, gltf_dir),

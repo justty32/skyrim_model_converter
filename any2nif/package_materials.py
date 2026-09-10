@@ -180,10 +180,13 @@ def _validate_texture_metadata(material, material_index: int) -> None:
                 )
         if slot == "normalTexture":
             normal_scale = _field(info, "scale", 1.0)
-            if normal_scale not in (None, 1.0):
+            if normal_scale is not None and (
+                isinstance(normal_scale, bool) or
+                not isinstance(normal_scale, (int, float)) or
+                not np.isfinite(normal_scale)
+            ):
                 raise AnyError(
-                    f"material {material_index} normalTexture scale {normal_scale} "
-                    "is not supported",
+                    f"material {material_index} normalTexture scale must be a finite number",
                     code=2,
                 )
 

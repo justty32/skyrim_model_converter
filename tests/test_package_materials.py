@@ -216,12 +216,13 @@ def test_identity_texture_transform_is_allowed_and_preserved(tmp_path):
     assert info.extensions["KHR_texture_transform"] == transform
 
 
-def test_normal_texture_non_default_scale_is_rejected(tmp_path):
-    material = {"normalTexture": {"index": 0, "scale": 0.5}}
+@pytest.mark.parametrize("scale", ["bad", float("nan"), float("inf")])
+def test_normal_texture_invalid_scale_is_rejected(tmp_path, scale):
+    material = {"normalTexture": {"index": 0, "scale": scale}}
     doc, _ = _document(image_uri=_uri(_png(), "image/png"), materials=[material])
     source = tmp_path / "source.gltf"
     source.write_text(json.dumps(doc))
     with pytest.raises(AnyError) as caught:
         prepare_materials(str(source), str(tmp_path / "out.gltf"))
     assert caught.value.code == 2
-    assert "normalTexture scale" in str(caught.value)
+    assert "normalTexture scale" in str(caught.value) or "cannot parse glTF" in str(caught.value)

@@ -144,7 +144,7 @@ usage: any2nif [-h] [--textures-out DIR] [--texprefix TEXPREFIX] [--scale SCALE]
 | 2 | 來源格式或 glTF 解析失敗；`argparse` 命令列用法錯誤亦回傳 2。 |
 | 3 | 來源含 skin、morph 或動畫，靜態後端拒絕。 |
 
-**輸出保證**：成功時產出 Skyrim SSE `.nif`；來源先統一為 glTF Y-up／公尺，再由 `gltf2nif` 轉成 Skyrim Z-up units。每個 glTF primitive 通常對應一個 `BSTriShape`；超過 65,535 頂點時自動分成多個 shape，保留原三角形與各頂點資料；指定 `--textures-out` 時另寫來源可解出的 diffuse／normal／specular／emissive DDS，指定 `--keep-intermediate` 時保留正規化結果。
+**輸出保證**：成功時產出 Skyrim SSE `.nif`；來源先統一為 glTF Y-up／公尺，再由 `gltf2nif` 轉成 Skyrim Z-up units。每個 glTF primitive 通常對應一個 `BSTriShape`；超過 65,535 頂點時自動分成多個 shape，保留原三角形與各頂點資料；指定 `--textures-out` 時另寫來源可解出的 diffuse／normal／specular／emissive DDS，指定 `--keep-intermediate` 時保留正規化結果。法線貼圖的 `normalTexture.scale` 會在 DDS 壓縮前烘焙到 X／Y 分量並正規化，再翻轉綠色通道。
 
 ### 自動盒狀碰撞
 

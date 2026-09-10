@@ -80,6 +80,44 @@ def test_bad_source_preserves_known_good_package(tmp_path):
     assert not list(tmp_path.glob(".any2nif-package-*"))
 
 
+@pytest.mark.parametrize("scale, expected", [
+    (0.0, (128, 127, 255)),
+    (0.5, (180, 75, 232)),
+    (2.0, (213, 42, 170)),
+    (-0.5, (75, 180, 232)),
+    (1e308, (218, 37, 128)),
+])
+def test_normal_strength_is_baked_into_referenced_dds(tmp_path, scale, expected):
+    source = _source(tmp_path)
+    doc = json.loads(source.read_text())
+    # Equal X/Y/Z before scaling: analytically known normalized directions.
+    payload = base64.b64encode(png_bytes(flat_rgb(8, (191, 191, 191)))).decode()
+    doc["images"][0]["uri"] = f"data:image/png;base64,{payload}"
+    doc["materials"][0]["normalTexture"] = {"index": 0, "scale": scale}
+    source.write_text(json.dumps(doc))
+    original = source.read_bytes()
+    output = tmp_path / "data"
+    args = [str(source), str(output), "--package"]
+    assert main(args) == 0
+    manifest = json.loads((output / MANIFEST).read_text())
+    refs = texture_references((output / manifest["mesh"]).read_bytes())
+    normal = next(ref for ref in refs if ref.endswith("_n.dds"))
+    with Image.open(output / normal.replace("\\", "/")) as image:
+        assert image.getpixel((0, 0))[:3] == pytest.approx(expected, abs=8)
+    # The diffuse shares the source image: normal processing must not mutate it.
+    diffuse = next(ref for ref in refs if ref.endswith("material_0000.dds"))
+    with Image.open(output / diffuse.replace("\\", "/")) as image:
+        assert image.getpixel((0, 0))[:3] == pytest.approx((191, 191, 191), abs=8)
+    assert source.read_bytes() == original
+    before = _snapshot(output)
+    assert main(args) == 0
+    assert _snapshot(output) == before
+    doc["materials"][0]["normalTexture"]["scale"] = "invalid"
+    source.write_text(json.dumps(doc))
+    assert main(args) == 2
+    assert _snapshot(output) == before
+
+
 def test_malformed_pbr_is_not_silently_replaced_with_defaults(tmp_path):
     source = _source(tmp_path)
     output = tmp_path / "data"
