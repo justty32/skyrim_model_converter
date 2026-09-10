@@ -92,23 +92,26 @@ def to_gltf(in_path: str, workdir: str) -> str:
         raise AnyError(f"{in_path}: no triangle geometry (point cloud, 2D-only, "
                         "or an empty/unparseable mesh)", 2)
 
-    scene = _assign_materials_and_pack(trimesh, mesh_geoms, stem)
+    scene = _assign_materials_and_pack(
+        trimesh, mesh_geoms, stem,
+        source_scene=loaded if isinstance(loaded, trimesh.Scene) else None)
 
     out_path = os.path.join(workdir, stem + ".glb")
     scene.export(out_path, file_type="glb")
     return out_path
 
 
-def _assign_materials_and_pack(trimesh, mesh_geoms: dict, stem: str):
+def _assign_materials_and_pack(trimesh, mesh_geoms: dict, stem: str, *, source_scene=None):
     """Give every geometry a PBRMaterial with a stable, meaningful `.name`,
-    then pack them into a fresh Scene (one geometry == one glTF primitive ==
-    one Mesh once gltf2nif.read_gltf gets hold of it)."""
+    then pack them into a fresh Scene, retaining source node instances and their
+    accumulated transforms when a scene was loaded."""
     from trimesh.visual.color import ColorVisuals
     from trimesh.visual.material import PBRMaterial
     from trimesh.visual.texture import TextureVisuals
 
     multi = len(mesh_geoms) > 1
-    scene = trimesh.Scene()
+    scene = (trimesh.Scene(base_frame=source_scene.graph.base_frame)
+             if source_scene is not None else trimesh.Scene())
     for index, (key, geom) in enumerate(mesh_geoms.items()):
         visual = geom.visual
         material = getattr(visual, "material", None)
@@ -130,6 +133,17 @@ def _assign_materials_and_pack(trimesh, mesh_geoms: dict, stem: str):
             pbr.name = final_name
             visual.material = pbr
 
-        scene.add_geometry(geom, geom_name=key)
+        if source_scene is None:
+            scene.add_geometry(geom, geom_name=key)
+        else:
+            scene.geometry[key] = geom
+
+    if source_scene is not None:
+        # Flatten hierarchy to world-space node transforms, not raw geometry.
+        # Keep one node per source instance; several nodes may share geometry.
+        for node in source_scene.graph.nodes_geometry:
+            matrix, geometry = source_scene.graph[node]
+            if geometry in mesh_geoms:
+                scene.graph.update(frame_to=node, matrix=matrix, geometry=geometry)
 
     return scene

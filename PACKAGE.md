@@ -8,7 +8,7 @@ python -m any2nif chair.glb output/Chair --package
 
 輸出目錄裡會有 `meshes/any2nif/chair/chair.nif`、`textures/any2nif/chair/` 內的 DDS，以及 `converter-package.json`。這是 Data 內容，不含 ESP：可交給已有的 ModForge 資產打包流程，或由既有 plugin 的 Model 欄位引用。這裡尚未新增 ModForge 的 `importmesh` 指令。
 
-來源 glTF／GLB 直接解析；OBJ、STL、PLY、DAE 等沿用 trimesh，FBX 使用專案內的 FBX2glTF。模型大小預設公尺，Y-up；公分來源加 `--unit cm`，Z-up 來源加 `--up-axis z`。`--asset-name chair_v2` 可指定輸出名稱，名稱會轉成 ASCII 小寫並排除路徑符號；空名稱與 Windows 保留名稱會拒絕。
+來源 glTF／GLB 直接解析；OBJ、STL、PLY、DAE 等沿用 trimesh，FBX 使用專案內的 FBX2glTF。trimesh 場景匯入會保留各零件的累積位移／旋轉／縮放與重複擺放，包含 DAE 的父子節點；模型與自動碰撞沿用同一擺放。模型大小預設公尺，Y-up；公分來源加 `--unit cm`，Z-up 來源加 `--up-axis z`。`--asset-name chair_v2` 可指定輸出名稱，名稱會轉成 ASCII 小寫並排除路徑符號；空名稱與 Windows 保留名稱會拒絕。
 
 超過 NIF 單一 shape 的 65,535 頂點或三角形限制時，會沿原本三角形順序自動切分；材質、法線、UV 與頂點色一起保留，不需要先手工拆模型。
 

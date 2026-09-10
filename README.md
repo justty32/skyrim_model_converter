@@ -76,7 +76,7 @@ MVP 已改自寫純 Python 後端（見下「實作」節），不再依賴外�
 
 **格式來源**：niftools/nifxml `nif.xml`（逐欄查證，非憑記憶；reference 檔 gitignore）。
 **跑**：`python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt`，然後 `python -m nif2gltf --in foo.nif --out foo.gltf --flat`。
-**測**：`.venv/Scripts/python -m pytest`（**478 passed**，2026-09-10 以 `.venv-wsl/bin/python -m pytest -q` 實跑；包含真 FBX2glTF）。
+**測**：`.venv/Scripts/python -m pytest`（**480 passed**，2026-09-10 以 `.venv-wsl/bin/python -m pytest -q` 實跑；包含真 FBX2glTF）。
 跨 repo live consumer 測試在同層
 `../godot-worldspace-editor/tests/test_model_fetch_contract.py`：production CLI 的 synthetic
 NIF `.gltf + .bin` 會由 Godot 4.6 production `ModelFetch._load_gltf()` 真正載入，並驗
@@ -105,7 +105,7 @@ python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--coll
 |---|---|
 | `any2nif/cli.py` | CLI 編排：單位／軸向、貼圖、碰撞、PBR 材質與 NIF 寫出；exit 0/1/2/3。 |
 | `any2nif/normalize.py` | 依副檔名分派：glTF/GLB 直通，OBJ/STL/PLY/DAE/ZAE/OFF/DXF/XYZ 走 trimesh，FBX 走 FBX2glTF。 |
-| `any2nif/trimesh_backend.py`、`fbx_backend.py` | 將非 glTF 來源正規化成 GLB，保留可用的 mesh／material 資訊。 |
+| `any2nif/trimesh_backend.py`、`fbx_backend.py` | 將非 glTF 來源正規化成 GLB，保留可用的 mesh／material 資訊；trimesh 路徑保留場景節點擺放，`tests/test_trimesh_instances.py` 驗真 DAE 的父子變換與整包碰撞。 |
 | `any2nif/collision.py` | `none`／自動 box、convex、convex-mesh／既有 hulls JSON；`tests/test_any2nif_collision.py` 驗真 CLI 碰撞尺度、平面加厚與大型 mesh。 |
 | `any2nif/mesh_split.py` | 依 NIF 每 shape 的 65,535 頂點／三角形上限自動切分，保留材質／頂點資料與三角形順序；`tests/test_any2nif_mesh_split.py` 驗大型 mesh 真 NIF 讀回與資料拒絕；`tests/test_triangle_limit.py` 驗共用頂點但面數超限的完整讀回，碰撞 suite 另跑真整包不丟面且不增加凸包。 |
 | `any2nif/package.py` | 完整 Data 目錄暫存、DDS 格式／引用驗證、manifest、發布／回復；`tests/test_any2nif_package.py` 跨格式真 CLI、所有貼圖槽與失敗保留驗證。 |
