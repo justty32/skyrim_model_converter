@@ -4,6 +4,8 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 ## 現役狀態
 
+2026-09-10 SheenChair 1024／2048 回家驗收包完成：`tools/build_sheen_validation.py` 用不同資產路徑產出兩版，逐檔驗 manifest、實際 NIF 幾何／DDS 尺寸／diffuse 與 4 凸包，再驗 ZIP CRC／雜湊。成品在忽略的 `backend/home-validation/20260910-151908-610853/`；ZIP 約 4.08／8.69 MB，整批附署名、操作說明、報告與 SHA256SUMS。兩版檔案路徑無交集；不含 ESP、沒有部署。完整 suite 437 passed，操作見 [HOME-VALIDATION](HOME-VALIDATION.md)，遊戲外觀與碰撞仍待回家。
+
 2026-09-10 共用 UV 的 normal 變換已完成：旋轉、鏡射、不等比縮放自動重烘；零縮放明確拒絕且保留舊包。15 組實際 NIF／DDS 法線方向測試通過（含來源提供／未提供 tangent）；shared 測試移除 AO 干擾，恢復舊路由的反例讓全部 10 組 shared cases 失敗。SheenChair 等四個真實模型試轉再次通過。
 
 2026-09-10 共用 UV 的 sampler 相容性已完成：邊緣延伸、鏡射重複與 nearest 放大採樣自動路由貼圖重烘；無效 sampler 索引／wrap／filter 明確拒絕並保留舊成品。新增 11 個實際 DDS／NIF 測試，一般 REPEAT＋linear 保持原 UV。完整 suite 與四個真實模型案例通過，SheenChair 顏色誤差與下列紀錄一致。

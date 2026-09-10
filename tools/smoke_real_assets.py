@@ -110,8 +110,9 @@ def validate_sheen_diffuse(source, output, original, result):
         for source_tri, target_tri in zip(source_triangles, target_triangles):
             atlas_corners = target_uv[target_tri]
             # Skip tiny charts: their BC1 blocks cannot represent a stable interior sample.
-            edge1 = (atlas_corners[1] - atlas_corners[0]) * 1024
-            edge2 = (atlas_corners[2] - atlas_corners[0]) * 1024
+            height, width = dds.shape[:2]
+            edge1 = (atlas_corners[1] - atlas_corners[0]) * [width, height]
+            edge2 = (atlas_corners[2] - atlas_corners[0]) * [width, height]
             area_pixels = abs(edge1[0] * edge2[1] - edge1[1] * edge2[0]) / 2
             if area_pixels < 8:
                 continue

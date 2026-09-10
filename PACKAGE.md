@@ -12,6 +12,8 @@ python -m any2nif chair.glb output/Chair --package
 
 超過 NIF 單一 shape 的 65,535 頂點限制時，會沿原本三角形順序自動切分；材質、法線、UV 與頂點色一起保留，不需要先手工拆模型。
 
+SheenChair 兩種解析度的成品重建與遊戲操作見 [回家驗收](HOME-VALIDATION.md)。
+
 ## 碰撞怎麼選
 
 | 選項 | 結果 |

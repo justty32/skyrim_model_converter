@@ -113,6 +113,7 @@ python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--coll
 | `any2nif/package_bake.py`、`bake_geometry.py` | 跨 UV 圖片重烘、AO 合成、逐實例／primitive 分離與頂點重映射；`tests/test_package_bake.py`、`test_bake_instances.py`、`test_package_normal_frames.py`、`test_package_sampler.py` 驗像素、法線、採樣設定、幾何與失敗保護。 |
 | `any2nif/uv_atlas.py` | xatlas 排版、像素覆蓋與邊緣補色；`tests/test_uv_atlas.py` 驗幾何保留、重疊與細面。 |
 | `any2nif/texture_sampling.py`、`normal_bake.py` | glTF wrap／濾波／sRGB 採樣及法線切線換算；`tests/test_texture_sampling.py`、`test_normal_bake.py` 驗解析值與方向。 |
+| `tools/build_sheen_validation.py` | SheenChair 1024／2048 獨立路徑的驗收包、實際成品與 ZIP 讀回；操作見 [HOME-VALIDATION.md](HOME-VALIDATION.md)。 |
 | `tools/smoke_real_assets.py` | 固定來源與 SHA-256 的公開模型下載／離線試轉，含真實網格 UV 衍生案例與 SheenChair DDS 顏色抽查；`tests/test_real_asset_validation.py` 驗抽查器；操作與結果見 [REAL-ASSETS.md](REAL-ASSETS.md)。 |
 | `any2nif/transform.py` | 將來源單位換算成公尺，並把來源 Z-up 正規化成 glTF Y-up；`tests/test_any2nif_transform.py` 驗無效縮放拒絕與負縮放的法線／繞向。 |
 | `any2nif/textures.py` | glTF 圖像轉 Skyrim diffuse／normal／specular／emissive `.dds` 槽位；烘焙法線強度。 |
