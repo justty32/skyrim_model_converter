@@ -10,6 +10,8 @@ python -m any2nif chair.glb output/Chair --package
 
 來源 glTF／GLB 直接解析；OBJ、STL、PLY、DAE 等沿用 trimesh，FBX 使用專案內的 FBX2glTF。trimesh 場景匯入會保留各零件的累積位移／旋轉／縮放與重複擺放，包含 DAE 的父子節點；模型與自動碰撞沿用同一擺放。模型大小預設公尺，Y-up；公分來源加 `--unit cm`，Z-up 來源加 `--up-axis z`。`--asset-name chair_v2` 可指定輸出名稱，名稱會轉成 ASCII 小寫並排除路徑符號；空名稱與 Windows 保留名稱會拒絕。
 
+OBJ／DAE／ZAE 匯入會檢查載入器實際要求的外部／壓縮包內資源；材質檔讀不到、貼圖缺失或無法解碼時會報錯，指出資源名稱並保留舊整包，不再悄悄換成白色。原本沒有材質／貼圖的來源仍可轉換。這不新增 MTL 貼圖指令支援；未被 trimesh 解析的貼圖槽仍沿用後端限制。
+
 超過 NIF 單一 shape 的 65,535 頂點或三角形限制時，會沿原本三角形順序自動切分；材質、法線、UV 與頂點色一起保留，不需要先手工拆模型。
 
 SheenChair 兩種解析度的成品重建與遊戲操作見 [回家驗收](HOME-VALIDATION.md)。

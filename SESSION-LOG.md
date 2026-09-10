@@ -4,6 +4,8 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 ## 現役狀態
 
+2026-09-10 OBJ／DAE／ZAE 資源失敗保護完成：`source_resources.py` 記錄被 trimesh 吞掉的材質檔讀取／影像解碼錯誤，載入後回 exit 2 並指出資源；ZAE 保留既有「第一份 DAE」選取方式，但使用受檢查的壓縮包讀取器，避免 loader 重建 resolver 後繞過檢查。真來源測試驗缺 PNG、壞 PNG、缺 MTL、外部 DAE／ZAE 內部綠色貼圖、正常空白檔名與相對子目錄，以及錯誤後舊整包完整 bytes 不變。ZAE 修正前兩項新測試實際失敗；OBJ 移除檢查的反例回 exit 0 並發布白材質，證明測試會抓回歸。完整 suite **492 passed**；這不新增 trimesh 未解析的 MTL 貼圖槽位。
+
 2026-09-10 trimesh 場景擺放修正完成：重新包 GLB 時保留來源節點的累積變換與重複擺放，不再把所有零件重置到原點。真 DAE fixture 包含旋轉／位移父層和鏡射／不等比縮放子層，驗逐面三角形角點、winding／normal 與實際整包的兩個分件凸包位置。恢復舊 fresh-Scene 行為的反例讓兩項新測試均失敗。完整 suite **480 passed**，SheenChair GLB 路徑不受此次非 glTF 匯入修正影響。
 
 2026-09-10 PLY 顏色與 NIF 顏色標記修正完成：trimesh 匯入保留顯式頂點 RGBA，面色拆開共用頂點並保留原平滑法線，不把隱含灰色當來源顏色。真 ASCII PLY 測試驗 normalized GLB 與實際 package 的 RGBA、色界、幾何／法線及無色來源；舊 ColorVisuals 替換反例確實失敗。另依 [NifTools nif.xml](https://github.com/niftools/nifxml/blob/develop/nif.xml) 修正 VertexAttribute 與 SkyrimShaderPropertyFlags2 的 Vertex_Colors 為 bit 5（0x20），不再誤設 Instance（0x200）／Assume_Shadowmask（0x80）。Lighting／Effect 與 PLY 測試直接讀 NIF descriptor、RGBA bytes 與 shader flags，不依賴本工具 reader 的顏色解碼。完整 suite **484 passed**，無頂點色的 legacy NIF 雜湊基準仍通過；舊彩色 NIF 需重轉，實機顏色驗收記在母 repo WAIT_USER。SheenChair 四個來源 primitive 均無頂點色，最新驗收批次可沿用。
@@ -40,7 +42,7 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 本次獨立 WSL 環境在 `.venv-wsl`，由既有 uv 建立；FBX2glTF 在忽略的 `tools/bin/`。Windows `.venv` 保留。使用者已授權專案內安裝依賴與 push。
 
-驗證：`.venv-wsl/bin/python -m pytest -q --disable-warnings` → **484 passed、零 skipped**；包含真 FBX2glTF、跨格式完整 Data 目錄、所有 DDS 槽位、65535 頂點切分、負縮放、錯誤資料與發布／回復。仍有既有套件的 deprecation warnings。
+驗證：`.venv-wsl/bin/python -m pytest -q --disable-warnings` → **492 passed、零 skipped**；包含真 FBX2glTF、跨格式完整 Data 目錄、所有 DDS 槽位、65535 頂點切分、負縮放、錯誤資料與發布／回復。仍有既有套件的 deprecation warnings。
 
 跨 repo darksouls-port live contract 先前嘗試：`.venv-wsl/bin/python -m unittest discover -s ../darksouls-port/tests -p test_model_converter_contract.py -v`，其 `initial_state.py` import 仍缺少 soulstruct，測試未能啟動。前輪 writer 新增可選 authored tangents，但裸 reader 預設不啟用；既有單／雙 shape 的 NIF SHA-256 基準與新 opt-in 隔離測試通過。未改 darksouls-port，不能把本 repo 測試當成跨 repo live contract 已通過。
 

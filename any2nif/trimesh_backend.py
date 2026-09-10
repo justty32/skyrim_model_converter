@@ -68,8 +68,30 @@ def to_gltf(in_path: str, workdir: str) -> str:
         raise AnyError(f"trimesh backend requires trimesh; install it into the "
                         f"project venv: {exc}", 1) from exc
 
+    resolver = None
+    validate_resources = None
     try:
-        loaded = trimesh.load(in_path, process=False, group_material=True)
+        load_source = in_path
+        load_options = {}
+        if ext in (".obj", ".dae", ".zae"):
+            from .source_resources import checked_resolver
+            delegate = None
+            if ext == ".zae":
+                # Match trimesh's first-DAE selection, but retain our checked
+                # archive resolver instead of letting load_zae replace it.
+                with open(in_path, "rb") as archive_file:
+                    archive = trimesh.util.decompress(archive_file, file_type="zip")
+                dae = next((name for name in archive if name.lower().endswith(".dae")), None)
+                if dae is None:
+                    raise AnyError("ZAE archive contains no DAE model", 2)
+                load_source = archive[dae]
+                load_options["file_type"] = "dae"
+                delegate = trimesh.resolvers.ZipResolver(archive)
+            resolver, validate_resources = checked_resolver(in_path, trimesh, delegate=delegate)
+        loaded = trimesh.load(load_source, process=False, group_material=True,
+                              resolver=resolver, **load_options)
+        if validate_resources is not None:
+            validate_resources()
     except ImportError as exc:
         if ext in _COLLADA_EXTENSIONS:
             raise AnyError(f"{ext} requires pycollada; install it into the "
