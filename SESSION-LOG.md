@@ -4,6 +4,8 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 ## 現役狀態
 
+2026-09-10 高面數模型切分修正完成：NIF 三角形數也是 16-bit，舊流程只查頂點數，65,536 面寫出後會讀回 0 面。any2nif 現在同時按頂點與面數切分，裸 writer 超限明確拒絕。33,489 頂點／66,248 面的共用頂點網格驗實際 NIF 逐角點、材質與切線；33,153 頂點／65,536 面的完整 package 驗 65,535＋1 面、DDS 解碼與單一來源凸包的邊界。恢復舊切分的反例確實變紅，完整 suite **478 passed**。SheenChair 各分件低於門檻，最新驗收批次仍為下列 160024 批，不需因此換包。
+
 2026-09-10 生成切線的鏡射 UV 接縫修正完成：共用頂點按 face 正反手性拆開，先生成 TANGENT 再做 NIF 頂點上限切分；來源與 atlas 皆以逐角點方向重烘，負縮放不再額外翻 normal Y。實際 NIF／DDS 回歸包含鏡射 U/V、node／全域反射、共用接縫與 65,538 頂點；完整 suite **470 passed**，四個真實模型通過。真實 SheenChair 曾抓到舊算法在小面邊中點的 basis 抵消，修正後兩種尺寸都通過。
 
 最新驗收批次為 `backend/home-validation/20260910-160024-009333/`：1024／2048 分別約 31／53 秒，ZIP 4,078,095／8,686,369 bytes。兩版皆 4 shapes、39,936 三角形、6 引用 DDS、4 凸包；幾何、尺寸、diffuse、manifest、ZIP CRC 與逐檔雜湊通過。新包包含切線／normal 方向修正，雜湊不同於舊批次；請攜帶最新整批或照 [HOME-VALIDATION](HOME-VALIDATION.md) 重建。遊戲內驗收仍待回家。
@@ -34,7 +36,7 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 本次獨立 WSL 環境在 `.venv-wsl`，由既有 uv 建立；FBX2glTF 在忽略的 `tools/bin/`。Windows `.venv` 保留。使用者已授權專案內安裝依賴與 push。
 
-驗證：`.venv-wsl/bin/python -m pytest -q --disable-warnings` → **470 passed、零 skipped**；包含真 FBX2glTF、跨格式完整 Data 目錄、所有 DDS 槽位、65535 頂點切分、負縮放、錯誤資料與發布／回復。仍有既有套件的 deprecation warnings。
+驗證：`.venv-wsl/bin/python -m pytest -q --disable-warnings` → **478 passed、零 skipped**；包含真 FBX2glTF、跨格式完整 Data 目錄、所有 DDS 槽位、65535 頂點切分、負縮放、錯誤資料與發布／回復。仍有既有套件的 deprecation warnings。
 
 跨 repo darksouls-port live contract 再次嘗試：`.venv-wsl/bin/python -m unittest discover -s ../darksouls-port/tests -p test_model_converter_contract.py -v`，其 `initial_state.py` import 仍缺少 soulstruct，測試未能啟動。本輪 writer 新增可選 authored tangents，但裸 reader 預設不啟用；既有單／雙 shape 的 NIF SHA-256 基準與新 opt-in 隔離測試通過。未改 darksouls-port，不能把本 repo 測試當成跨 repo live contract 已通過。
 

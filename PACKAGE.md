@@ -10,7 +10,7 @@ python -m any2nif chair.glb output/Chair --package
 
 來源 glTF／GLB 直接解析；OBJ、STL、PLY、DAE 等沿用 trimesh，FBX 使用專案內的 FBX2glTF。模型大小預設公尺，Y-up；公分來源加 `--unit cm`，Z-up 來源加 `--up-axis z`。`--asset-name chair_v2` 可指定輸出名稱，名稱會轉成 ASCII 小寫並排除路徑符號；空名稱與 Windows 保留名稱會拒絕。
 
-超過 NIF 單一 shape 的 65,535 頂點限制時，會沿原本三角形順序自動切分；材質、法線、UV 與頂點色一起保留，不需要先手工拆模型。
+超過 NIF 單一 shape 的 65,535 頂點或三角形限制時，會沿原本三角形順序自動切分；材質、法線、UV 與頂點色一起保留，不需要先手工拆模型。
 
 SheenChair 兩種解析度的成品重建與遊戲操作見 [回家驗收](HOME-VALIDATION.md)。
 
@@ -32,7 +32,7 @@ SheenChair 兩種解析度的成品重建與遊戲操作見 [回家驗收](HOME-
 python -m any2nif doorway.glb output/Doorway --package --collision convex-mesh
 ```
 
-分組以正規化後的每個 node × primitive 為準，同一網格的不同擺放也各自產生碰撞。超過 65,535 頂點而切出的 NIF shape 不會增加凸包數量。來源若把整扇門框合成單一 primitive，仍會填滿門洞；材質分區也可能將一個物件分成多個 primitive。這個選項沿用來源分件，不會自動將凹形網格拆成凸塊。任何分件退化或無法產生凸包時，整包失敗並保留舊成品。
+分組以正規化後的每個 node × primitive 為準，同一網格的不同擺放也各自產生碰撞。超過 65,535 頂點或三角形而切出的 NIF shape 不會增加凸包數量。來源若把整扇門框合成單一 primitive，仍會填滿門洞；材質分區也可能將一個物件分成多個 primitive。這個選項沿用來源分件，不會自動將凹形網格拆成凸塊。任何分件退化或無法產生凸包時，整包失敗並保留舊成品。
 
 ## 貼圖與材質
 
@@ -66,7 +66,7 @@ python -m any2nif SheenChair.glb output/SheenChair --package --collision convex-
 
 採樣支援 REPEAT、MIRRORED_REPEAT、CLAMP_TO_EDGE，以及 nearest／bilinear；共用 UV 的非預設 sampler 也會自動重烘，無效 sampler 索引／wrap／filter 會拒絕。RGB 色圖在線性空間取樣，normal、roughness、AO 等資料圖不做 sRGB 轉換。烘焙以來源最高解析度取樣，未模擬視角相關的來源 mip／anisotropic 濾波。Atlas 預留外圈供小區塊補救，未覆蓋區域補最近的邊緣顏色，再交給既有 DDS 完整 mipmap 流程。4096 的四槽合成模型完整試轉約 89 秒、峰值記憶體約 1.52 GiB（本次 WSL 實測，非所有模型的上限）。
 
-AO 使用紅色通道與 `strength`，乘進線性 diffuse，之後再套 diffuse RGB factor；alpha 不乘 AO。這是傳統 Skyrim 的陰影近似，會讓直接光照也變暗，並非 glTF 的環境光遮蔽等價實作。normal 會先套強度，再按原 UV 與新 UV 的切線方向換算；有來源 tangent 時保留其方向與 handedness，再依 UV 變換換算；沒有來源 tangent 時，從 UV 的兩個方向求切線與正反手性，包含鏡射 UV；生成方式仍是平滑近似，並非 MikkTSpace。normal 變換需要可逆的 UV 縮放。超過 NIF 頂點上限時保留切分前已生成的切線方向。負 `--scale` 的鏡射由 NIF 切線正反手性處理。Sheen 與材質 variants 仍不轉成 Skyrim 對等效果，使用來源預設材質。
+AO 使用紅色通道與 `strength`，乘進線性 diffuse，之後再套 diffuse RGB factor；alpha 不乘 AO。這是傳統 Skyrim 的陰影近似，會讓直接光照也變暗，並非 glTF 的環境光遮蔽等價實作。normal 會先套強度，再按原 UV 與新 UV 的切線方向換算；有來源 tangent 時保留其方向與 handedness，再依 UV 變換換算；沒有來源 tangent 時，從 UV 的兩個方向求切線與正反手性，包含鏡射 UV；生成方式仍是平滑近似，並非 MikkTSpace。normal 變換需要可逆的 UV 縮放。超過 NIF 頂點／三角形上限時保留切分前已生成的切線方向。負 `--scale` 的鏡射由 NIF 切線正反手性處理。Sheen 與材質 variants 仍不轉成 Skyrim 對等效果，使用來源預設材質。
 
 公開真實模型的固定版本、試轉結果與可重跑指令見 [REAL-ASSETS.md](REAL-ASSETS.md)。
 

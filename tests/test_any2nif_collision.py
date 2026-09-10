@@ -262,3 +262,45 @@ def test_large_source_primitive_keeps_one_hull_after_render_splitting(tmp_path):
     points = _read_collision_vertices(data)
     np.testing.assert_allclose(points.min(axis=0), [0, -1, 0])
     np.testing.assert_allclose(points.max(axis=0), [1, 0, 1])
+
+
+def test_high_face_count_package_keeps_geometry_and_single_source_hull(tmp_path):
+    from any2nif.cli import main
+    from any2nif.package import MANIFEST
+    from PIL import Image
+
+    # 33,153 shared vertices fit ushort, but 65,536 triangles do not.
+    width, height = 128, 256
+    positions = [(x / width, y / height, 0.0)
+                 for y in range(height + 1) for x in range(width + 1)]
+    triangles = []
+    for y in range(height):
+        for x in range(width):
+            a = y * (width + 1) + x
+            b, c, d = a + 1, a + width + 1, a + width + 2
+            triangles.extend(((a, b, c), (b, d, c)))
+    source = tmp_path / "dense.gltf"
+    write_gltf_interleaved(str(source), [{
+        "positions": positions, "normals": [(0, 0, 1)] * len(positions),
+        "uvs": [p[:2] for p in positions], "triangles": triangles,
+    }])
+    output = tmp_path / "Data"
+    assert main([str(source), str(output), "--package", "--collision", "convex-mesh"]) == 0
+    manifest = json.loads((output / MANIFEST).read_text())
+    data = (output / manifest["mesh"]).read_bytes()
+    meshes = read_nif(data)
+    assert [len(mesh.triangles) for mesh in meshes] == [65535, 1]
+    actual = np.asarray([mesh.positions[i] for mesh in meshes
+                         for face in mesh.triangles for i in face]) / 70.03
+    expected = np.asarray(positions)[np.asarray(triangles)].reshape(-1, 3)
+    np.testing.assert_allclose(actual, expected, atol=1e-6)
+    types = _read_header(_Reader(data))["types"]
+    assert types.count("bhkConvexVerticesShape") == 1
+    assert "bhkListShape" not in types
+    points = _read_collision_vertices(data)
+    np.testing.assert_allclose(points.min(axis=0), [0, -.025, 0], atol=1e-6)
+    np.testing.assert_allclose(points.max(axis=0), [1, .025, 1], atol=1e-6)
+    assert manifest["textures"]
+    for ref in manifest["textures"]:
+        with Image.open(output / ref.replace("\\", "/")) as image:
+            image.load()

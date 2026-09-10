@@ -549,6 +549,9 @@ def build_nif(meshes: list[Mesh], texprefix: str, normal_map_flags: list[bool],
         if len(m.positions) > 0xFFFF:
             raise ValueError(f"shape '{m.name}' has {len(m.positions)} verts > 65535 "
                              "(SSE BSTriShape is 16-bit; split the mesh)")
+        if len(m.triangles) > 0xFFFF:
+            raise ValueError(f"shape '{m.name}' has {len(m.triangles)} triangles > 65535 "
+                             "(SSE BSTriShape is 16-bit; split the mesh)")
 
     strings: list[str] = [root_name, "BSX"]
     blocks: list[tuple[str, bytes]] = []

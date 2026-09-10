@@ -72,8 +72,8 @@ def _part(mesh, triangles, number):
     )
 
 
-def split_meshes(meshes, max_vertices=65535):
-    """Return meshes whose triangle-referenced vertex sets fit ``max_vertices``.
+def split_meshes(meshes, max_vertices=65535, *, max_triangles=65535):
+    """Return meshes within both vertex and triangle count limits.
 
     Meshes already within the limit are returned by identity unless generated
     tangent handedness requires seam preparation. Oversized meshes are greedily
@@ -83,12 +83,15 @@ def split_meshes(meshes, max_vertices=65535):
     if isinstance(max_vertices, bool) or not isinstance(max_vertices, int) or max_vertices < 3:
         raise AnyError("mesh split: max_vertices must be an integer of at least 3")
 
+    if isinstance(max_triangles, bool) or not isinstance(max_triangles, int) or max_triangles < 1:
+        raise AnyError("mesh split: max_triangles must be a positive integer")
+
     result = []
     for mesh in meshes:
         _validate(mesh)
         mesh = prepare_tangent_frames(mesh)
         _validate(mesh)
-        if len(mesh.positions) <= max_vertices:
+        if len(mesh.positions) <= max_vertices and len(mesh.triangles) <= max_triangles:
             result.append(mesh)
             continue
         if not mesh.triangles:
@@ -99,7 +102,8 @@ def split_meshes(meshes, max_vertices=65535):
         used = set()
         for triangle in mesh.triangles:
             added = set(triangle) - used
-            if current and len(used) + len(added) > max_vertices:
+            if current and (len(used) + len(added) > max_vertices or
+                            len(current) >= max_triangles):
                 batches.append(current)
                 current = []
                 used = set()
