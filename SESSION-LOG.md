@@ -4,6 +4,8 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 ## 現役狀態
 
+2026-09-10 共用 UV 的 sampler 相容性已完成：邊緣延伸、鏡射重複與 nearest 放大採樣自動路由貼圖重烘；無效 sampler 索引／wrap／filter 明確拒絕並保留舊成品。新增 11 個實際 DDS／NIF 測試，一般 REPEAT＋linear 保持原 UV。完整 suite 與四個真實模型案例通過，SheenChair 顏色誤差與下列紀錄一致。
+
 2026-09-10 跨 UV 重烘已完成：不同槽的座標／變換自動排成逐 primitive／實例獨立 atlas，支援 wrap／採樣、線性 diffuse × AO、normal 切線換算及負縮放；`--bake-size` 64～4096，預設 1024。所有面皆檢查像素覆蓋，極細面配置獨立小區塊；沒有安全空間就要求提高尺寸並保留舊成品。新增 xatlas 0.0.11，僅裝專案 `.venv-wsl`。
 
 本輪 Done when 已達成：SheenChair 原版成功產出 4 shapes、39,936 三角形、6 個實際 DDS 引用、4 凸包；四材質 diffuse 抽查平均誤差 0.0044～0.0097，黑圖反例確實被拒。最終真實模型腳本四案例全數通過；細節與固定來源在 [REAL-ASSETS](REAL-ASSETS.md)。normal 方向、紅色大面／藍色微小島、重複擺放、非 triangle 略過與錯誤保護另有合成測試。
@@ -22,10 +24,10 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 本次獨立 WSL 環境在 `.venv-wsl`，由既有 uv 建立；FBX2glTF 在忽略的 `tools/bin/`。Windows `.venv` 保留。使用者已授權專案內安裝依賴與 push。
 
-驗證：`.venv-wsl/bin/python -m pytest -q --disable-warnings` → **414 passed、零 skipped**；包含真 FBX2glTF、跨格式完整 Data 目錄、所有 DDS 槽位、65535 頂點切分、負縮放、錯誤資料與發布／回復。仍有既有套件的 deprecation warnings。
+驗證：`.venv-wsl/bin/python -m pytest -q --disable-warnings` → **425 passed、零 skipped**；包含真 FBX2glTF、跨格式完整 Data 目錄、所有 DDS 槽位、65535 頂點切分、負縮放、錯誤資料與發布／回復。仍有既有套件的 deprecation warnings。
 
 跨 repo darksouls-port live contract 另行嘗試，但其 `initial_state.py` import 缺少 soulstruct，未能開始執行；本輪未改 darksouls-port 或裸 `gltf2nif` writer，不能把本 repo 測試當成該跨 repo 測試已通過。
 
 ## 後續方向
 
-跨 UV 重烘已完成；共用 UV 直通模式仍限制 normal 旋轉／鏡射。共用 UV 的非 REPEAT sampler 尚未路由重烘，後續應補這條相容性（writer 目前固定 wrap），避免只在跨 UV 時套到新的採樣器。True PBR、反向貼圖、蒙皮／動畫、凹形碰撞自動拆分與 ModForge spec 的黑盒接線仍是另外的工作。本輪不宣稱這些已完成；舊 idea 的入口已改標目前實作與歷史方案。
+跨 UV 重烘已完成；共用 UV 直通模式仍限制 normal 旋轉／鏡射。共用 UV 的非 REPEAT／nearest sampler 已路由重烘。True PBR、反向貼圖、蒙皮／動畫、凹形碰撞自動拆分與 ModForge spec 的黑盒接線仍是另外的工作。本輪不宣稱這些已完成；舊 idea 的入口已改標目前實作與歷史方案。

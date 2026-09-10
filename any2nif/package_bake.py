@@ -55,27 +55,49 @@ def read_uv(gltf, buffers, primitive, mapping, count):
     return uv, mapped
 
 
-def _needs_bake(material):
-    mappings = [_mapping(info, slot) for slot, info in _material_texture_infos(material)]
-    return len(set(mappings)) > 1 or material.occlusionTexture is not None
+def _sampling(gltf, info):
+    index = _field(info, 'index')
+    if isinstance(index, bool) or not isinstance(index, int) or not 0 <= index < len(gltf.textures):
+        raise AnyError('texture-info references missing texture', code=2)
+    texture = gltf.textures[index]
+    sampler = None
+    if texture.sampler is not None:
+        index = texture.sampler
+        if (isinstance(index, bool) or not isinstance(index, int) or
+                not 0 <= index < len(gltf.samplers or [])):
+            raise AnyError('texture references missing sampler', code=2)
+        sampler = gltf.samplers[index]
+
+    def enum(field, choices, default=None):
+        value = getattr(sampler, field, None)
+        if value is None:
+            return default
+        if isinstance(value, bool) or not isinstance(value, int) or value not in choices:
+            raise AnyError(f'invalid texture {field}', code=2)
+        return value
+
+    mag = enum('magFilter', (9728, 9729), 9729)
+    enum('minFilter', (9728, 9729, 9984, 9985, 9986, 9987))
+    return dict(wrap_s=enum('wrapS', (10497, 33648, 33071), 10497),
+                wrap_t=enum('wrapT', (10497, 33648, 33071), 10497),
+                linear=mag != 9728)
+
+
+def _needs_bake(gltf, material):
+    infos = list(_material_texture_infos(material))
+    mappings = [_mapping(info, slot) for slot, info in infos]
+    # The NIF writer has no per-texture sampler controls. Bake non-default
+    # sampling even when every slot shares the same UV set and transform.
+    sampling = [_sampling(gltf, info) for _, info in infos]
+    return (len(set(mappings)) > 1 or material.occlusionTexture is not None or
+            any(s['wrap_s'] != 10497 or s['wrap_t'] != 10497 or not s['linear']
+                for s in sampling))
 
 
 def _image(gltf, payloads, info):
+    options = _sampling(gltf, info)
     texture = gltf.textures[_field(info, 'index')]
-    rgba = _decode_rgba(payloads[texture.source][0], texture.source)
-    sampler = None
-    if texture.sampler is not None:
-        if not 0 <= texture.sampler < len(gltf.samplers):
-            raise ValueError('texture references missing sampler')
-        sampler = gltf.samplers[texture.sampler]
-    mag = getattr(sampler, 'magFilter', None)
-    if mag not in (None, 9728, 9729):
-        raise ValueError('invalid texture magFilter')
-    if getattr(sampler, 'minFilter', None) not in (None, 9728, 9729, 9984, 9985, 9986, 9987):
-        raise ValueError('invalid texture minFilter')
-    return rgba, dict(wrap_s=10497 if getattr(sampler, 'wrapS', None) is None else sampler.wrapS,
-                      wrap_t=10497 if getattr(sampler, 'wrapT', None) is None else sampler.wrapT,
-                      linear=mag != 9728)
+    return _decode_rgba(payloads[texture.source][0], texture.source), options
 
 
 def _set_image(gltf, payloads, info, pixels, *, srgb=False):
@@ -214,7 +236,7 @@ def bake_material_uvs(gltf, buffers, payloads, *, size=1024, normal_y_sign=1):
     for mesh in gltf.meshes or []:
         for primitive in mesh.primitives or []:
             mi = primitive.material
-            if mi is None or not 0 <= mi < len(originals) or not _needs_bake(originals[mi]):
+            if mi is None or not 0 <= mi < len(originals) or not _needs_bake(gltf, originals[mi]):
                 continue
             material = copy.deepcopy(originals[mi])
             print(f'baking material {mi}: {size} x {size} UV atlas', file=sys.stderr, flush=True)

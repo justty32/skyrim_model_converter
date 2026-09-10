@@ -281,7 +281,7 @@ def prepare_materials(gltf_path: str, output_path: str, *, bake_size: int = 1024
                 primitive.material = len(gltf.materials)
                 gltf.materials.append(Material())
     from .package_bake import bake_material_uvs, _needs_bake
-    if any(_needs_bake(m) for m in gltf.materials):
+    if any(_needs_bake(gltf, m) for m in gltf.materials):
         from gltf2nif import read_gltf, GltfError
         from .bake_geometry import flatten_instances
         try:

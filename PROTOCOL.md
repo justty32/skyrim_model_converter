@@ -164,7 +164,7 @@ JSON 路徑沿用原契約：內容已是 Y-up 公尺，**不再**套來源單�
 
 `any2nif <source> <output-directory> --package [--asset-name NAME]` 將 `out_path` 解讀為完整 Data 目錄。模型／貼圖位置由同一個名稱計算；不接受另外的 `--textures-out`、`--texprefix`、`--keep-intermediate`。來源尺度／軸向與 collision JSON 保持前述契約。名稱會正規化成 ASCII 小寫，Windows 保留名稱拒絕。
 
-`--package` 的材質處理、發布與 `model-converter-package/1` manifest 契約見 [PACKAGE.md](PACKAGE.md)；單檔模式不能使用 `--asset-name` 或 `--bake-size`。整包新增的替代 UV／共用 `KHR_texture_transform` 會先烘進 TEXCOORD_0；各槽不同 UV 或帶 AO 時，改用獨立 atlas 與貼圖重採樣。`--bake-size` 可選 64 到 4096 的二次方尺寸，預設 1024。單檔模式不做這項預處理。無效 UV／採樣設定仍回 exit 2，normal 與 AO 的近似限制見同份文件。
+`--package` 的材質處理、發布與 `model-converter-package/1` manifest 契約見 [PACKAGE.md](PACKAGE.md)；單檔模式不能使用 `--asset-name` 或 `--bake-size`。整包新增的替代 UV／共用 `KHR_texture_transform` 會先烘進 TEXCOORD_0；各槽不同 UV、帶 AO，或使用非 REPEAT wrap／nearest magnification 時，改用獨立 atlas 與貼圖重採樣。`--bake-size` 可選 64 到 4096 的二次方尺寸，預設 1024。單檔模式不做這項預處理。無效 UV／採樣設定仍回 exit 2，normal 與 AO 的近似限制見同份文件。
 
 ## 貼圖編碼：`tex2dds`
 
