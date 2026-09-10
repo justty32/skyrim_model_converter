@@ -56,6 +56,9 @@ class Mesh:
     # Optional linear RGBA vertex colours. Appended/defaulted for byte compatibility.
     colors: list[tuple[float, float, float, float]] = field(default_factory=list)
 
+    # Authored glTF tangent XYZ and handedness W; empty retains legacy UV basis.
+    tangents: list[tuple[float, float, float, float]] = field(default_factory=list)
+
     @property
     def has_normals(self) -> bool:
         return bool(self.positions) and len(self.normals) == len(self.positions)

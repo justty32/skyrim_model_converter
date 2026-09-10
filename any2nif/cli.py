@@ -116,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
             return exc.code
 
         try:
-            meshes = read_gltf(gltf_path)
+            meshes = read_gltf(gltf_path, preserve_tangents=True)
         except GltfError as exc:
             message = str(exc)
             code = 3 if ("skinning" in message or "morph" in message or

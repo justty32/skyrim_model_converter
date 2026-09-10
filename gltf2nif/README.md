@@ -2,7 +2,7 @@
 
 ← [model-converter README](../README.md)｜[PROTOCOL](../PROTOCOL.md)｜正向對照鏡子：[`nif2gltf/`](../nif2gltf/)（模組職責表見 [README §實作](../README.md)；本模組的欄位佈局以它的 parser 為權威）
 
-model-converter 的**反向後端**：把 glTF 2.0 靜態 mesh 寫成 Skyrim Special Edition 的 `.nif`（`BSTriShape` 幾何 + `BSLightingShaderProperty` 材質 + 選配 `bhk` 碰撞）。直接服務 [darksouls-port](../../ModForge/sub_projs/darksouls-port/plan.md) 的 `FLVER→glTF→NIF` 管線。
+model-converter 的**反向後端**：把 glTF 2.0 靜態 mesh 寫成 Skyrim Special Edition 的 `.nif`（`BSTriShape` 幾何 + `BSLightingShaderProperty` 材質 + 選配 `bhk` 碰撞）。直接服務 [darksouls-port](../../darksouls-port/plan.md) 的 `FLVER→glTF→NIF` 管線。
 
 **第一道驗證＝round-trip**：寫出的 `.nif` 丟回 `nif2gltf` parser 讀，三角形/頂點/UV/貼圖路徑要對得回輸入 glTF。寫出器的每個位元組佈局都對過真實 vanilla SSE nif（一顆帶 `BSTriShape`+`BSLightingShaderProperty`+`bhkRigidBody` 的市售 mesh）與 `nif2gltf` reader。
 
@@ -52,7 +52,7 @@ glTF (x, y, z)  →  Skyrim (x, −z, y)            # normal / 平面（方向�
 
   `BSVertexDesc` = `0x0001b000_00650407`（VertexDataSize=7、UV off=4、Normal off=5、Tangent off=6、attributes `VF_VERTEX|VF_UV|VF_NORMALS|VF_TANGENTS`=0x1B）。**刻意不設 `VF_FULLPREC`（0x400）旗標**——真實 vanilla 靜態也不設，靠 UV offset≥12 自描述判 float3（`nif2gltf` 就是這樣推的），這樣位元組與 vanilla 一致。
 - `Data Size` = `stride × numVerts + numTris × 6`（含頂點與三角資料，對過 vanilla）。
-- normals：glTF 有就帶、沒有就算面法線（area-weighted）。tangent frame 用 Lengyel 法從 UV 現算（掛了 normal map 需要切線基）。
+- normals：glTF 有就帶、沒有就算面法線（area-weighted）。裸命令預設仍用 Lengyel 法從 UV 現算 tangent frame。`any2nif` 透過 `read_gltf(..., preserve_tangents=True)` 啟用來源 TANGENT，存進 `Mesh.tangents`；[tangents.py](tangents.py) 處理驗證、node transform 與 handedness，writer 保留該方向。未提供此欄位的 Mesh 維持原本輸出；替代 UV／atlas 預處理仍只由整包入口負責。
 - **限制**：SSE `BSTriShape` 的頂點/三角數是 16-bit，單一 shape 上限 65535 頂點；超過會報錯（請在上游切 mesh）。
 
 ## 材質：`BSLightingShaderProperty` + `BSShaderTextureSet`

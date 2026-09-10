@@ -4,7 +4,9 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 ## 現役狀態
 
-2026-09-10 SheenChair 1024／2048 回家驗收包完成：`tools/build_sheen_validation.py` 用不同資產路徑產出兩版，逐檔驗 manifest、實際 NIF 幾何／DDS 尺寸／diffuse 與 4 凸包，再驗 ZIP CRC／雜湊。成品在忽略的 `backend/home-validation/20260910-151908-610853/`；ZIP 約 4.08／8.69 MB，整批附署名、操作說明、報告與 SHA256SUMS。兩版檔案路徑無交集；不含 ESP、沒有部署。完整 suite 437 passed，操作見 [HOME-VALIDATION](HOME-VALIDATION.md)，遊戲外觀與碰撞仍待回家。
+2026-09-10 直通貼圖流程的來源 TANGENT 保留已完成：any2nif 啟用 reader opt-in，Mesh／切分／來源軸向／負縮放／writer 一路保留方向與 W；烘焙沿用相同驗證，缺 NORMAL 時忽略來源切線。無 NORMAL 的 atlas 案例另以刻意不同的有效 TANGENT，比較移除前後整包完全相同。22 個 normal-frame tests 直接解碼 NIF T/B/N 與 DDS，涵蓋旋轉、鏡射、不等比 node scale 及 `--scale -2 --up-axis z`，直通保持原 UV 與 8×8 normal DDS。13 個 tangent contracts 驗無效資料保留舊包、65,538 頂點的實際 NIF 切分，以及裸 reader 預設仍忽略來源 tangent；強制關閉 opt-in 的反例使 authored-normal 測試失敗。四個真實模型試轉通過，SheenChair diffuse 結果不變。
+
+2026-09-10 SheenChair 1024／2048 回家驗收包完成：`tools/build_sheen_validation.py` 用不同資產路徑產出兩版，逐檔驗 manifest、實際 NIF 幾何／DDS 尺寸／diffuse 與 4 凸包，再驗 ZIP CRC／雜湊。成品在忽略的 `backend/home-validation/20260910-153248-865768/`；ZIP 約 4.08／8.69 MB，整批附署名、操作說明、報告與 SHA256SUMS。兩版檔案路徑無交集；不含 ESP、沒有部署。本輪用修正後程式重建，兩個 ZIP 雜湊與前一批相同。當輪完整 suite 437 passed，操作見 [HOME-VALIDATION](HOME-VALIDATION.md)，遊戲外觀與碰撞仍待回家。
 
 2026-09-10 共用 UV 的 normal 變換已完成：旋轉、鏡射、不等比縮放自動重烘；零縮放明確拒絕且保留舊包。15 組實際 NIF／DDS 法線方向測試通過（含來源提供／未提供 tangent）；shared 測試移除 AO 干擾，恢復舊路由的反例讓全部 10 組 shared cases 失敗。SheenChair 等四個真實模型試轉再次通過。
 
@@ -28,9 +30,9 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 本次獨立 WSL 環境在 `.venv-wsl`，由既有 uv 建立；FBX2glTF 在忽略的 `tools/bin/`。Windows `.venv` 保留。使用者已授權專案內安裝依賴與 push。
 
-驗證：`.venv-wsl/bin/python -m pytest -q --disable-warnings` → **437 passed、零 skipped**；包含真 FBX2glTF、跨格式完整 Data 目錄、所有 DDS 槽位、65535 頂點切分、負縮放、錯誤資料與發布／回復。仍有既有套件的 deprecation warnings。
+驗證：`.venv-wsl/bin/python -m pytest -q --disable-warnings` → **457 passed、零 skipped**；包含真 FBX2glTF、跨格式完整 Data 目錄、所有 DDS 槽位、65535 頂點切分、負縮放、錯誤資料與發布／回復。仍有既有套件的 deprecation warnings。
 
-跨 repo darksouls-port live contract 另行嘗試，但其 `initial_state.py` import 缺少 soulstruct，未能開始執行；本輪未改 darksouls-port 或裸 `gltf2nif` writer，不能把本 repo 測試當成該跨 repo 測試已通過。
+跨 repo darksouls-port live contract 再次嘗試：`.venv-wsl/bin/python -m unittest discover -s ../darksouls-port/tests -p test_model_converter_contract.py -v`，其 `initial_state.py` import 仍缺少 soulstruct，測試未能啟動。本輪 writer 新增可選 authored tangents，但裸 reader 預設不啟用；既有單／雙 shape 的 NIF SHA-256 基準與新 opt-in 隔離測試通過。未改 darksouls-port，不能把本 repo 測試當成跨 repo live contract 已通過。
 
 ## 後續方向
 

@@ -192,7 +192,12 @@ def _build_bstrishape(name_idx: int, shader_ref: int, mesh: Mesh,
         ln = (nx * nx + ny * ny + nz * nz) ** 0.5 or 1.0
         sk_nrm.append((nx / ln, ny / ln, nz / ln))
     uvs = mesh.uvs if mesh.has_uvs else [(0.0, 0.0)] * len(sk_pos)
-    tangents, bitangents = compute_tangents(sk_pos, sk_nrm, uvs, mesh.triangles)
+    if mesh.tangents:
+        from .tangents import tangent_basis
+        authored = [(*gltf_to_skyrim_dir(*t[:3]), t[3]) for t in mesh.tangents]
+        tangents, bitangents = tangent_basis(authored, sk_nrm)
+    else:
+        tangents, bitangents = compute_tangents(sk_pos, sk_nrm, uvs, mesh.triangles)
 
     n = len(sk_pos)
     center, radius = _bounding_sphere(sk_pos)
@@ -531,7 +536,8 @@ def build_nif(meshes: list[Mesh], texprefix: str, normal_map_flags: list[bool],
     `material_specs` is keyword-only and optional by design: the five positional
     parameters above are a frozen cross-process contract (darksouls-port calls this
     build as a subprocess). When it is None -- or every entry is None -- the output
-    is byte-for-byte what it has always been. Entries align positionally with
+    is byte-for-byte what it has always been for legacy meshes (no authored tangents).
+    Entries align positionally with
     `meshes`; a None entry means "that shape keeps the static defaults".
     """
     for m in meshes:

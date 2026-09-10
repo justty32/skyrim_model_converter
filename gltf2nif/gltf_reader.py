@@ -187,8 +187,8 @@ def _material_basename(gltf: GLTF2, prim) -> str:
     return os.path.splitext(name)[0]
 
 
-def read_gltf(path: str) -> list[Mesh]:
-    """Parse a .gltf/.glb into Mesh IR. Raises GltfError on unusable input."""
+def read_gltf(path: str, *, preserve_tangents: bool = False) -> list[Mesh]:
+    """Parse static glTF; optional authored tangents leave the legacy default intact."""
     try:
         gltf = GLTF2().load(path)
     except Exception as exc:  # noqa: BLE001
@@ -295,13 +295,19 @@ def read_gltf(path: str) -> list[Mesh]:
             tris = [tuple(flat[i:i + 3]) for i in range(0, len(flat), 3)]
             if not positions or not tris:
                 continue
+            tangents = []
+            if preserve_tangents:
+                from .tangents import read_tangents, tangent_basis
+                tangents = read_tangents(gltf, buffers, attrs, len(positions), world[:3, :3])
             positions, normals = _transform_geometry(positions, normals, world)
+            if tangents:
+                tangent_basis(tangents, normals)  # Reject unusable frames before publishing.
             if float(np.linalg.det(world[:3, :3])) < 0:
                 tris = [(a, c, b) for a, b, c in tris]
             node_name = node.name if node is not None else ""
             meshes.append(Mesh(
                 name=node_name or gmesh.name or f"mesh_{mi}_{pi}",
-                positions=positions, normals=normals, uvs=uvs, colors=colors,
+                positions=positions, normals=normals, uvs=uvs, colors=colors, tangents=tangents,
                 triangles=tris,
                 material=_material_basename(gltf, prim),
                 material_index=_material_index(gltf, prim),

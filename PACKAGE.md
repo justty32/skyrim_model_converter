@@ -44,6 +44,8 @@ diffuse 輸出 BC1／BC3；normal 會先將 `normalTexture.scale` 烘進法線�
 
 傳統 Skyrim 材質不是完整 PBR。Metallic／roughness 以既有公式近似，roughness 影像反相為 specular mask；`KHR_materials_specular` 有提供時優先採用。True PBR、材質的完全等價轉換與凹形碰撞自動拆分仍未實作。骨架、動畫、morph 與 sparse accessor 沿用靜態後端的拒絕規則。
 
+來源同時提供 `NORMAL` 與 `TANGENT` 時，`any2nif` 會保留切線方向及正反手性，連同 node transform、`--up-axis`、負縮放與大模型切分一起傳到 NIF。共用 UV 的直通路徑不因此重排 UV 或放大貼圖，避免丟失來源的凹凸方向。缺少 `NORMAL` 時忽略來源 `TANGENT`；生成法線仍沿用既有平滑近似。來源切線必須是與頂點數相符的 FLOAT VEC4、方向有限且非零、W 為 ±1，不能與 normal 平行；壞資料回 exit 2 並保留舊包。bitangent 的關係依 [glTF mesh 規格](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#meshes-overview)。重烘路徑仍按來源切線換算法線圖，再交給 NIF 的 atlas 切線方向。
+
 法線強度支援 0（消除傾斜）、介於 0 與 1（減弱）、大於 1（加強）及負值（反轉 X／Y）；NaN／Infinity 會報錯。計算依 [glTF normalTexture.scale 定義](https://raw.githubusercontent.com/KhronosGroup/glTF/main/specification/2.0/schema/material.normalTextureInfo.schema.json)，在壓縮前烘焙，因此仍有 DDS 壓縮與濾波誤差。
 
 整包支援替代 `TEXCOORD_n`，以及 `KHR_texture_transform` 的位移、旋轉、縮放與 `texCoord` 覆寫。各貼圖共用座標集與變換時，轉換器會把結果直接烘進 NIF 的單一 UV，原始模型不變。變換順序依 [Khronos 規格](https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_texture_transform)：先縮放、再旋轉、最後位移。支援 float 與正規化 unsigned byte／short UV；缺少指定座標、非有限值或超出 NIF 半精度範圍會拒絕。

@@ -31,6 +31,7 @@ def _validate(mesh):
     _validate_values("normals", mesh.normals, 3, count)
     _validate_values("uvs", mesh.uvs, 2, count)
     _validate_values("colors", mesh.colors, 4, count)
+    _validate_values("tangents", mesh.tangents, 4, count)
     for number, triangle in enumerate(mesh.triangles):
         if not isinstance(triangle, (tuple, list)) or len(triangle) != 3:
             raise AnyError(f"mesh split: triangle {number} must have exactly 3 indices")
@@ -65,6 +66,7 @@ def _part(mesh, triangles, number):
         material=mesh.material,
         material_index=mesh.material_index,
         colors=select(mesh.colors),
+        tangents=select(mesh.tangents),
     )
 
 

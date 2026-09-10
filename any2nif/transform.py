@@ -66,10 +66,14 @@ def apply(meshes, *, scale: float = 1.0, up_axis: str = "y"):
             mesh.positions = [_zup_to_yup(p) for p in mesh.positions]
             if mesh.normals:
                 mesh.normals = [_zup_to_yup(n) for n in mesh.normals]
+            if mesh.tangents:
+                mesh.tangents = [(*_zup_to_yup(t[:3]), t[3]) for t in mesh.tangents]
         if scale != 1.0:
             mesh.positions = [(x * scale, y * scale, z * scale) for x, y, z in mesh.positions]
             if scale < 0.0:
                 if mesh.normals:
                     mesh.normals = [(-x, -y, -z) for x, y, z in mesh.normals]
+                if mesh.tangents:
+                    mesh.tangents = [(-x, -y, -z, -w) for x, y, z, w in mesh.tangents]
                 mesh.triangles = [(a, c, b) for a, b, c in mesh.triangles]
     return meshes

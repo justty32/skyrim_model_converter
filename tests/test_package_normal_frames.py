@@ -4,6 +4,7 @@ import base64
 import io
 import json
 import math
+import struct
 
 import numpy as np
 import pytest
@@ -13,6 +14,8 @@ from any2nif.cli import main
 from any2nif.package import MANIFEST
 from any2nif.texture_sampling import CLAMP_TO_EDGE, sample_rgba
 from nif2gltf.nif_reader import read_nif
+from nif2gltf._binreader import _Reader
+from nif2gltf.nif_reader import _read_header
 from tests.test_package_bake import _write_two_uv_gltf
 
 
@@ -52,20 +55,6 @@ def _add_tangents_and_transform(path, transform, *, shared_mapping=False,
     path.write_text(json.dumps(doc))
 
 
-def _reference_vertex_frames(positions, normals, uvs, triangles):
-    tangent_sum = np.zeros_like(positions, dtype=float)
-    for tri in triangles:
-        a, b, c = tri
-        e1, e2 = positions[b] - positions[a], positions[c] - positions[a]
-        d1, d2 = uvs[b] - uvs[a], uvs[c] - uvs[a]
-        tangent = (d2[1] * e1 - d1[1] * e2) / (d1[0] * d2[1] - d2[0] * d1[1])
-        tangent_sum[tri] += tangent
-    tangent_sum -= normals * np.sum(normals * tangent_sum, axis=1)[:, None]
-    tangent_sum /= np.linalg.norm(tangent_sum, axis=1)[:, None]
-    bitangent = np.cross(normals, tangent_sum)
-    return np.stack((tangent_sum, bitangent, normals), axis=2)
-
-
 def _reference_generated_source_frame(sampling):
     positions = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]], dtype=float)
     normal = np.array([0, 0, 1], dtype=float)
@@ -91,6 +80,65 @@ def _reference_generated_source_frame(sampling):
     return np.column_stack((tangent_sum[0], bitangent[0], normal))
 
 
+def _identity_shared_authored_tangent(path, handedness, node_angle, node_scale=(1, 1, 1),
+                                      *, normal_present=True):
+    doc = json.loads(path.read_text())
+    material = doc["materials"][0]
+    del material["occlusionTexture"]
+    infos = [material["emissiveTexture"], material["normalTexture"],
+             material["pbrMetallicRoughness"]["baseColorTexture"],
+             material["pbrMetallicRoughness"]["metallicRoughnessTexture"]]
+    for info in infos:
+        info["texCoord"] = 0
+        info.pop("extensions", None)
+    doc["samplers"] = [{}]
+    h = 2 ** -0.5
+    tangent = np.tile(np.array([h, h, 0, handedness], dtype="<f4"), (4, 1)).tobytes()
+    raw = base64.b64decode(doc["buffers"][0]["uri"].split(",", 1)[1])
+    doc["bufferViews"].append({"buffer": 0, "byteOffset": len(raw),
+                               "byteLength": len(tangent)})
+    doc["accessors"].append({"bufferView": len(doc["bufferViews"]) - 1,
+                             "componentType": 5126, "count": 4, "type": "VEC4"})
+    doc["meshes"][0]["primitives"][0]["attributes"]["TANGENT"] = len(doc["accessors"]) - 1
+    if not normal_present:
+        doc["meshes"][0]["primitives"][0]["attributes"].pop("NORMAL")
+    payload = raw + tangent
+    doc["buffers"][0] = {"uri": "data:application/octet-stream;base64," +
+                          base64.b64encode(payload).decode(), "byteLength": len(payload)}
+    normal = np.broadcast_to(np.array([210, 190, 180, 255], dtype=np.uint8), (8, 8, 4))
+    stream = io.BytesIO()
+    Image.fromarray(normal, "RGBA").save(stream, "PNG")
+    doc["images"][2]["uri"] = "data:image/png;base64," + base64.b64encode(stream.getvalue()).decode()
+    doc["nodes"][0]["rotation"] = [0, 0, math.sin(node_angle / 2), math.cos(node_angle / 2)]
+    doc["nodes"][0]["scale"] = list(node_scale)
+    path.write_text(json.dumps(doc))
+
+
+def _stored_nif_frames(data):
+    header = _read_header(_Reader(data))
+    block = header["types"].index("BSTriShape")
+    start = header["offsets"][block]
+    descriptor = struct.unpack_from("<Q", data, start + 100)[0]
+    stride = (descriptor & 0xF) * 4
+    vertex_count = struct.unpack_from("<H", data, start + 110)[0]
+    vertex_data = start + 116
+
+    def snorm(value):
+        return value / 127.5 - 1.0
+
+    frames = []
+    for index in range(vertex_count):
+        offset = vertex_data + index * stride
+        bx = struct.unpack_from("<f", data, offset + 12)[0]
+        nx, ny, nz, by, tx, ty, tz, bz = data[offset + 20:offset + 28]
+        skyrim = np.column_stack(((snorm(tx), snorm(ty), snorm(tz)),
+                                  (bx, snorm(by), snorm(bz)),
+                                  (snorm(nx), snorm(ny), snorm(nz))))
+        # NIF reader exposes glTF axes: Skyrim (x,y,z) -> glTF (x,z,-y).
+        frames.append(skyrim[[0, 2, 1], :] * np.array([[1], [1], [-1]]))
+    return np.asarray(frames)
+
+
 @pytest.mark.parametrize("transform", [
     {"rotation": math.pi / 2},
     {"scale": [-1, 1], "offset": [1, 0]},
@@ -114,17 +162,15 @@ def test_cli_preserves_world_normal_for_normal_texture_transform(
                  "--collision", "none"]) == 0
 
     manifest = json.loads((output / MANIFEST).read_text())
-    mesh = read_nif((output / manifest["mesh"]).read_bytes())[0]
+    nif_data = (output / manifest["mesh"]).read_bytes()
+    mesh = read_nif(nif_data)[0]
     normal_ref = next(ref for ref in manifest["textures"] if ref.endswith("_n.dds"))
     with Image.open(output / normal_ref.replace("\\", "/")) as image:
         normal_map = np.asarray(image.convert("RGBA"))
 
-    positions = np.asarray(mesh.positions, dtype=float)
-    normals = np.asarray(mesh.normals, dtype=float)
-    normals /= np.linalg.norm(normals, axis=1)[:, None]
     uvs = np.asarray(mesh.uvs, dtype=float)
     triangles = np.asarray(mesh.triangles, dtype=int)
-    target = _reference_vertex_frames(positions, normals, uvs, triangles)
+    target = _stored_nif_frames(nif_data)
 
     angle = transform.get("rotation", 0.0)
     scale = transform.get("scale", [1, 1])
@@ -157,3 +203,74 @@ def test_cli_preserves_world_normal_for_normal_texture_transform(
         actual_world /= np.linalg.norm(actual_world)
         np.testing.assert_allclose(actual_world, expected_world, atol=.12,
                                    err_msg=f"triangle {face}, transform={transform}")
+
+
+@pytest.mark.parametrize(("handedness", "node_angle", "node_scale", "cli_args"), [
+    pytest.param(1, 0, (1, 1, 1), [], id="identity-w+"),
+    pytest.param(-1, 0, (1, 1, 1), [], id="identity-w-"),
+    pytest.param(1, math.pi / 3, (1, 1, 1), [], id="node-rotation"),
+    pytest.param(1, 0, (-1, 1, 1), [], id="node-reflection"),
+    pytest.param(1, 0, (2, .5, 1), [], id="node-nonuniform"),
+    pytest.param(1, 0, (1, 1, 1), ["--scale", "-2", "--up-axis", "z"],
+                 id="global-zup-reflection"),
+])
+def test_identity_shared_uv_preserves_authored_tangent_basis(
+        tmp_path, handedness, node_angle, node_scale, cli_args):
+    source = tmp_path / "authored.gltf"
+    _write_two_uv_gltf(source)
+    _identity_shared_authored_tangent(source, handedness, node_angle, node_scale)
+    output = tmp_path / "Data"
+    assert main([str(source), str(output), "--package", "--bake-size", "64",
+                 "--collision", "none", *cli_args]) == 0
+    manifest = json.loads((output / MANIFEST).read_text())
+    nif_data = (output / manifest["mesh"]).read_bytes()
+    mesh = read_nif(nif_data)[0]
+    normal_ref = next(ref for ref in manifest["textures"] if ref.endswith("_n.dds"))
+    with Image.open(output / normal_ref.replace("\\", "/")) as image:
+        assert image.size == (8, 8)  # direct path preserves source resolution; no atlas
+        normal_map = np.asarray(image.convert("RGBA"))
+    uvs, triangles = np.asarray(mesh.uvs, float), np.asarray(mesh.triangles, int)
+    np.testing.assert_allclose(uvs, [[.1, .1], [.9, .1], [.9, .9], [.1, .9]], atol=.001)
+    target = _stored_nif_frames(nif_data)
+
+    h = 2 ** -0.5
+    c, s = math.cos(node_angle), math.sin(node_angle)
+    linear = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]]) @ np.diag(node_scale)
+    if cli_args:
+        zup_to_yup = np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]])
+        linear = (-2 * np.eye(3)) @ zup_to_yup @ linear
+    tangent = linear @ np.array((h, h, 0))
+    tangent /= np.linalg.norm(tangent)
+    normal = np.linalg.inv(linear).T @ np.array((0, 0, 1))
+    normal /= np.linalg.norm(normal)
+    bitangent = np.cross(normal, tangent) * handedness * np.sign(np.linalg.det(linear))
+    authored = np.column_stack((tangent, bitangent, normal))
+    encoded = np.array([210, 190, 180], float) / 255 * 2 - 1
+    encoded /= np.linalg.norm(encoded)
+    expected = authored @ encoded
+    expected /= np.linalg.norm(expected)
+    for triangle in triangles:
+        uv = uvs[triangle].mean(axis=0)
+        sampled = sample_rgba(normal_map, uv[None])[0, :3]
+        sampled[1] = 1 - sampled[1]
+        tangent_normal = sampled * 2 - 1
+        tangent_normal /= np.linalg.norm(tangent_normal)
+        frame = target[triangle].mean(axis=0)
+        frame /= np.linalg.norm(frame, axis=0)
+        actual = frame @ tangent_normal
+        actual /= np.linalg.norm(actual)
+        np.testing.assert_allclose(actual, expected, atol=.12)
+
+
+def test_supplied_tangent_is_ignored_when_normal_attribute_is_missing(tmp_path):
+    source = tmp_path / "generated-normal.gltf"
+    _write_two_uv_gltf(source)
+    _identity_shared_authored_tangent(source, 1, 0, normal_present=False)
+    output = tmp_path / "Data"
+    assert main([str(source), str(output), "--package", "--bake-size", "64",
+                 "--collision", "none"]) == 0
+    manifest = json.loads((output / MANIFEST).read_text())
+    frames = _stored_nif_frames((output / manifest["mesh"]).read_bytes())
+    # UV-derived basis is +X/+Y; the authored 45-degree tangent must be ignored.
+    np.testing.assert_allclose(frames[:, :, 0], np.tile((1, 0, 0), (len(frames), 1)), atol=.02)
+    np.testing.assert_allclose(frames[:, :, 1], np.tile((0, 1, 0), (len(frames), 1)), atol=.02)

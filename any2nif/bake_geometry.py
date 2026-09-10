@@ -6,7 +6,7 @@ import numpy as np
 from pygltflib import Node, Scene
 
 from gltf2nif.gltf_reader import _read_accessor, _scene_instances, _transform_geometry
-from gltf2nif import GltfError
+from gltf2nif.tangents import read_tangents, tangent_basis
 
 
 def flatten_instances(gltf, buffers):
@@ -30,20 +30,12 @@ def flatten_instances(gltf, buffers):
             if normals:
                 attrs.NORMAL = append_accessor(gltf, buffers, normals, 'VEC3')
             determinant = float(np.linalg.det(world[:3, :3]))
-            if attrs.TANGENT is not None:
-                acc = gltf.accessors[attrs.TANGENT]
-                if acc.type != 'VEC4' or acc.componentType != 5126 or acc.normalized:
-                    raise GltfError('TANGENT must use non-normalized FLOAT VEC4')
-                tangents = np.asarray(_read_accessor(gltf, buffers, attrs.TANGENT), dtype=np.float64)
-                if tangents.shape != (len(positions), 4) or not np.isfinite(tangents).all():
-                    raise GltfError('TANGENT has invalid count or values')
-                tangents[:, :3] = tangents[:, :3] @ world[:3, :3].T
-                lengths = np.linalg.norm(tangents[:, :3], axis=1)
-                if np.any(lengths < 1e-12):
-                    raise GltfError('node transform produced a zero-length tangent')
-                tangents[:, :3] /= lengths[:, None]
-                tangents[:, 3] *= -1 if determinant < 0 else 1
+            tangents = read_tangents(gltf, buffers, attrs, len(positions), world[:3, :3])
+            if tangents:
+                tangent_basis(tangents, normals)
                 attrs.TANGENT = append_accessor(gltf, buffers, tangents, 'VEC4')
+            else:
+                attrs.TANGENT = None
             if determinant < 0:
                 indices = (_read_accessor(gltf, buffers, primitive.indices) if primitive.indices is not None
                            else np.arange(len(positions)))
