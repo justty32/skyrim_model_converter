@@ -4,9 +4,15 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 ## 現役狀態
 
-2026-09-10 真實模型與 UV 續行已完成：整包支援替代 UV、共用 KHR_texture_transform 的位移／旋轉／縮放／texCoord 覆寫，烘進單一 NIF UV。帶 normal 時限正值等比縮放與位移；不同槽的 UV 對應仍拒絕。新增 25 個測試，實際讀回 NIF 座標、normal DDS 引用並驗失敗保護。
+2026-09-10 跨 UV 重烘已完成：不同槽的座標／變換自動排成逐 primitive／實例獨立 atlas，支援 wrap／採樣、線性 diffuse × AO、normal 切線換算及負縮放；`--bake-size` 64～4096，預設 1024。所有面皆檢查像素覆蓋，極細面配置獨立小區塊；沒有安全空間就要求提高尺寸並保留舊成品。新增 xatlas 0.0.11，僅裝專案 `.venv-wsl`。
 
-公開模型試轉與來源見 [REAL-ASSETS.md](REAL-ASSETS.md)：Lantern、Avocado 原版與 LanternUV 衍生版通過；SheenChair 因混合 UV 預期拒絕。`tools/smoke_real_assets.py` 固定來源版本與 SHA-256，素材／產物留忽略的 `backend/real-assets/`。整支腳本已實跑通過，包含三角形／位置／UV 讀回；尚無遊戲畫面驗收。
+本輪 Done when 已達成：SheenChair 原版成功產出 4 shapes、39,936 三角形、6 個實際 DDS 引用、4 凸包；四材質 diffuse 抽查平均誤差 0.0044～0.0097，黑圖反例確實被拒。最終真實模型腳本四案例全數通過；細節與固定來源在 [REAL-ASSETS](REAL-ASSETS.md)。normal 方向、紅色大面／藍色微小島、重複擺放、非 triangle 略過與錯誤保護另有合成測試。
+
+4096 四槽合成模型完整 CLI 試轉 exit 0，約 89 秒、峰值 RSS 1,595,832 KiB（約 1.52 GiB）；烘焙逐槽／分塊處理，不把所有槽的浮點 atlas 同時常駐。來源／成品留忽略的 `backend/bake-memory/`。
+
+2026-09-10 真實模型與 UV 續行已完成：整包支援替代 UV、共用 KHR_texture_transform 的位移／旋轉／縮放／texCoord 覆寫，烘進單一 NIF UV。帶 normal 時限正值等比縮放與位移；當時不同槽的 UV 對應仍拒絕，現已由上述重烘補上。新增 25 個測試，實際讀回 NIF 座標、normal DDS 引用並驗失敗保護。
+
+公開模型試轉與來源見 [REAL-ASSETS.md](REAL-ASSETS.md)：Lantern、Avocado 原版與 LanternUV 衍生版通過；SheenChair 原先因混合 UV 拒絕，現已成功試轉。`tools/smoke_real_assets.py` 固定來源版本與 SHA-256，素材／產物留忽略的 `backend/real-assets/`。整支腳本已實跑通過，包含三角形／位置／UV 讀回；尚無遊戲畫面驗收。
 
 2026-09-10 分件碰撞已完成：`--collision convex-mesh` 依正規化後的 node × primitive 各自建立凸包。離線驗證分件門框保留空隙、重複擺放與尺度軸向、多凸包 NIF 引用，以及 65,538 頂點完整整包的渲染切分不改碰撞分組。單一 primitive 的凹洞仍不會自動拆分。
 
@@ -16,10 +22,10 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 本次獨立 WSL 環境在 `.venv-wsl`，由既有 uv 建立；FBX2glTF 在忽略的 `tools/bin/`。Windows `.venv` 保留。使用者已授權專案內安裝依賴與 push。
 
-驗證：`.venv-wsl/bin/python -m pytest -q --disable-warnings` → **335 passed、零 skipped**；包含真 FBX2glTF、跨格式完整 Data 目錄、所有 DDS 槽位、65535 頂點切分、負縮放、錯誤資料與發布／回復。仍有既有套件的 deprecation warnings。
+驗證：`.venv-wsl/bin/python -m pytest -q --disable-warnings` → **414 passed、零 skipped**；包含真 FBX2glTF、跨格式完整 Data 目錄、所有 DDS 槽位、65535 頂點切分、負縮放、錯誤資料與發布／回復。仍有既有套件的 deprecation warnings。
 
 跨 repo darksouls-port live contract 另行嘗試，但其 `initial_state.py` import 缺少 soulstruct，未能開始執行；本輪未改 darksouls-port 或裸 `gltf2nif` writer，不能把本 repo 測試當成該跨 repo 測試已通過。
 
 ## 後續方向
 
-跨 UV 貼圖重烘、normal 貼圖旋轉／鏡射的切線補償仍待後續。True PBR、反向貼圖、蒙皮／動畫、凹形碰撞自動拆分與 ModForge spec 的黑盒接線仍是另外的工作。本輪不宣稱這些已完成；舊 idea 的入口已改標目前實作與歷史方案。
+跨 UV 重烘已完成；共用 UV 直通模式仍限制 normal 旋轉／鏡射。共用 UV 的非 REPEAT sampler 尚未路由重烘，後續應補這條相容性（writer 目前固定 wrap），避免只在跨 UV 時套到新的採樣器。True PBR、反向貼圖、蒙皮／動畫、凹形碰撞自動拆分與 ModForge spec 的黑盒接線仍是另外的工作。本輪不宣稱這些已完成；舊 idea 的入口已改標目前實作與歷史方案。

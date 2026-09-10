@@ -86,12 +86,12 @@ def test_bad_mapping_keeps_existing_package(tmp_path, transform, normal):
     assert before == {p.relative_to(output): p.read_bytes() for p in output.rglob("*") if p.is_file()}
 
 
-def test_different_texture_mappings_are_rejected(tmp_path, capsys):
+def test_different_mapping_with_missing_uv_is_rejected(tmp_path, capsys):
     source, doc = _source(tmp_path, {}, normal=True)
     doc["materials"][0]["normalTexture"]["texCoord"] = 0
     source.write_text(json.dumps(doc))
     assert main([str(source), str(tmp_path / "Data"), "--package"]) == 2
-    assert "different UV mappings" in capsys.readouterr().err
+    assert "TEXCOORD_0: missing UV accessor" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("change", ["missing", "count", "components", "truncated", "sparse", "nan"])

@@ -106,6 +106,7 @@ def convert_package(args):
     """Reuse the existing single-file converter inside an isolated Data tree."""
     from .cli import DEFAULT_TEXPREFIX, main
     from .package_materials import prepare_materials
+    from .transform import resolve_scale
 
     try:
         if args.textures_out or args.texprefix != DEFAULT_TEXPREFIX or args.keep_intermediate:
@@ -125,7 +126,9 @@ def convert_package(args):
             work = staging / "work"
             work.mkdir()
             normalized = normalize_to_gltf(str(source), str(work), fbx2gltf=args.fbx2gltf)
-            prepared = prepare_materials(normalized, str(work / "prepared.gltf"))
+            prepared = prepare_materials(normalized, str(work / "prepared.gltf"),
+                                         bake_size=args.bake_size or 1024,
+                                         normal_y_sign=-1 if resolve_scale(args.unit, args.scale) < 0 else 1)
             data_dir = staging / "data"
             nif = data_dir / "meshes" / "any2nif" / name / f"{name}.nif"
             texture_dir = data_dir / "textures" / "any2nif" / name

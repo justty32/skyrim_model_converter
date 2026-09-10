@@ -174,14 +174,15 @@ def _decode_rgba(raw: bytes, image_index: int) -> np.ndarray:
 
 
 def _bake_rgb(rgba: np.ndarray, factor: list[float]) -> bytes:
-    rgb = rgba[:, :, :3].astype(np.float64) / 255.0
-    linear = np.where(rgb <= 0.04045, rgb / 12.92,
-                      ((rgb + 0.055) / 1.055) ** 2.4)
-    linear *= np.asarray(factor[:3], dtype=np.float64)[None, None, :]
-    srgb = np.where(linear <= 0.0031308, linear * 12.92,
-                    1.055 * np.power(linear, 1.0 / 2.4) - 0.055)
     baked = rgba.copy()
-    baked[:, :, :3] = np.clip(np.rint(srgb * 255.0), 0, 255).astype(np.uint8)
+    for start in range(0, len(rgba), 64):
+        rgb = rgba[start:start + 64, :, :3].astype(np.float64) / 255.0
+        linear = np.where(rgb <= 0.04045, rgb / 12.92,
+                          ((rgb + 0.055) / 1.055) ** 2.4)
+        linear *= np.asarray(factor[:3], dtype=np.float64)[None, None, :]
+        srgb = np.where(linear <= 0.0031308, linear * 12.92,
+                        1.055 * np.power(linear, 1.0 / 2.4) - 0.055)
+        baked[start:start + 64, :, :3] = np.clip(np.rint(srgb * 255.0), 0, 255).astype(np.uint8)
     output = io.BytesIO()
     PILImage.fromarray(baked, "RGBA").save(output, format="PNG")
     return output.getvalue()
@@ -227,7 +228,8 @@ def _ensure_diffuse(gltf: GLTF2, material, image_payloads: list[tuple[bytes, str
     pbr.baseColorTexture = info
 
 
-def prepare_materials(gltf_path: str, output_path: str) -> str:
+def prepare_materials(gltf_path: str, output_path: str, *, bake_size: int = 1024,
+                      normal_y_sign: int = 1) -> str:
     """Write and return a self-contained glTF suitable for packaged NIF conversion."""
     if not os.path.isfile(gltf_path):
         raise AnyError(f"cannot read source glTF: {gltf_path}", code=1)
@@ -278,6 +280,18 @@ def prepare_materials(gltf_path: str, output_path: str) -> str:
             if primitive.material is None:
                 primitive.material = len(gltf.materials)
                 gltf.materials.append(Material())
+    from .package_bake import bake_material_uvs, _needs_bake
+    if any(_needs_bake(m) for m in gltf.materials):
+        from gltf2nif import read_gltf, GltfError
+        from .bake_geometry import flatten_instances
+        try:
+            read_gltf(gltf_path)  # Validate static geometry before atlas work or scene flattening.
+            flatten_instances(gltf, buffers)
+        except (GltfError, ValueError, IndexError, TypeError) as exc:
+            message = str(exc)
+            code = 3 if any(word in message for word in ("skinning", "morph", "animated")) else 2
+            raise AnyError(message, code=code) from exc
+    bake_material_uvs(gltf, buffers, payloads, size=bake_size, normal_y_sign=normal_y_sign)
     from .package_uv import prepare_uvs
     prepare_uvs(gltf, buffers)
 

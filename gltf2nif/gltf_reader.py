@@ -214,7 +214,7 @@ def read_gltf(path: str) -> list[Mesh]:
             if mode != _TRIANGLES:
                 continue  # only triangle lists
             attrs = prim.attributes
-            if attrs.POSITION is None:
+            if getattr(attrs, "POSITION", None) is None:
                 continue
             attribute_indices = [attrs.POSITION]
             if attrs.NORMAL is not None:

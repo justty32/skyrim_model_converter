@@ -40,7 +40,10 @@ def prepare_uvs(gltf, buffers):
 
     mappings = {}
     identity = (0, (0, 0), (1, 1), 0)
+    used = {p.material for m in gltf.meshes or [] for p in m.primitives or []}
     for mi, material in enumerate(gltf.materials):
+        if mi not in used:
+            continue
         infos = list(_material_texture_infos(material))
         mapping = None
         for slot, info in infos:

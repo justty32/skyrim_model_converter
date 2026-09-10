@@ -59,6 +59,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("out_path", help="target .nif")
     parser.add_argument("--package", action="store_true",
                         help="write a complete Data directory at out_path (meshes, textures, collision)")
+    parser.add_argument("--bake-size", type=int, choices=(64, 128, 256, 512, 1024, 2048, 4096),
+                        help="package UV baking texture size (default: 1024)")
     parser.add_argument("--asset-name", help="package mesh/texture subpath name (default: source stem)")
     parser.add_argument("--textures-out", metavar="DIR",
                         help="write the source's textures here as .dds (BC1/BC3 + mipmaps)")
@@ -90,8 +92,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.package:
         from .package import convert_package
         return convert_package(args)
-    if args.asset_name:
-        print("error: --asset-name requires --package", file=sys.stderr)
+    if args.asset_name or args.bake_size is not None:
+        print("error: --asset-name and --bake-size require --package", file=sys.stderr)
         return 1
 
     if not os.path.isfile(args.in_path):
