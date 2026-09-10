@@ -9,6 +9,8 @@ from gltf2nif.geometry import convex_hull_planes
 
 from .errors import AnyError
 
+AUTO_MODES = ("box", "convex", "convex-mesh")
+
 
 def _render_vertices(meshes):
     """Return finite, triangle-referenced render vertices in Havok Z-up metres."""
@@ -64,7 +66,7 @@ def _convex(vertices):
 
 
 def collision_hulls(mode, meshes):
-    """Resolve none, automatic box/convex, or the existing metre/Y-up JSON input.
+    """Resolve none, automatic hulls, or the existing metre/Y-up JSON input.
 
     Box bounds cover the entire visible model after node/unit/axis transforms.
     Only triangle-referenced vertices contribute. Thin axes receive 5 cm of
@@ -72,8 +74,22 @@ def collision_hulls(mode, meshes):
     """
     if not mode or mode == "none":
         return None
-    if mode not in ("box", "convex"):
+    if mode not in AUTO_MODES:
         return load_hulls(mode)
+
+    if mode == "convex-mesh":
+        hulls = []
+        for index, mesh in enumerate(meshes):
+            try:
+                hulls.append(_convex(_render_vertices([mesh])))
+            except AnyError as exc:
+                raise AnyError(
+                    f"automatic collision: mesh {index} ({mesh.name!r}): {exc}",
+                    code=exc.code,
+                ) from exc
+        if not hulls:
+            raise AnyError("automatic collision: model has no meshes")
+        return hulls
 
     vertices = _render_vertices(meshes)
     if mode == "convex":

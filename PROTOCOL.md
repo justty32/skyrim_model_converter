@@ -131,7 +131,7 @@ usage: any2nif [-h] [--textures-out DIR] [--texprefix TEXPREFIX] [--scale SCALE]
 | `--scale SCALE` | | 額外套用的均勻座標縮放；與 `--unit` 相乘。 |
 | `--unit UNIT` | | 來源單位；`m`（預設）、`cm`、`mm`、`in`、`ft`，先換算成公尺。 |
 | `--up-axis {y,z}` | | 來源檔的 up axis；預設 `y`，`z` 會轉成 glTF Y-up。 |
-| `--collision COLLISION` | | `none`（單檔預設無碰撞）、`box`（盒狀）、`convex`（外形凸包），或既有 hulls JSON 路徑；整包預設 `convex`。 |
+| `--collision COLLISION` | | `none`（單檔預設無碰撞）、`box`（盒狀）、`convex`（外形凸包）、`convex-mesh`（每個來源 primitive 各自凸包），或既有 hulls JSON 路徑；整包預設 `convex`。 |
 | `--root-name ROOT_NAME` | | 根 `NiNode` 名；預設 `Scene Root`。 |
 | `--fbx2gltf FBX2GLTF` | | FBX 輸入專用的 FBX2glTF binary 路徑。 |
 | `--no-materials` | | 忽略來源 PBR 材質值，使用 `gltf2nif` 靜態預設值。 |
@@ -154,7 +154,9 @@ python -m any2nif crate.glb crate.nif --collision box
 
 `box` 將所有 mesh 中三角形用到的頂點合併計算邊界，使用套完 node transform、`--unit`、`--scale` 與 `--up-axis` 的座標。產出一個盒狀 `bhkConvexVerticesShape`，碰撞頂點保持 Havok 公尺，僅旋轉到 Z-up，不套 render 的 70.03 倍。任一軸不足 5 公分時，向兩側等量補到 5 公分，避免平面物件沒有碰撞厚度。它會填滿模型內部空洞，適合箱子等簡單物件；若要沿模型外形包覆可用 `convex`：SciPy 計算一個外殼，不填盒子多出來的角，但仍會填凹洞。平面沿法線加厚 5 公分，點／線退化會拒絕；凹形自動拆分仍未完成。
 
-JSON 路徑沿用原契約：內容已是 Y-up 公尺，**不再**套來源單位或軸向。檔名若剛好是 `box`、`convex` 或 `none`，加上 `./` 表明是路徑。自動模式遇到空模型或非有限座標會失敗（exit 1）。
+`convex-mesh` 依正規化後的 node × primitive 分組，使用相同的尺度／軸向與平面加厚規則；NIF 頂點上限造成的 shape 切分不改碰撞分組。多個凸包透過 `bhkListShape` 接到同一個固定 rigid body。單一 primitive 的凹洞仍填滿，分組限制與整包範例見 [PACKAGE.md](PACKAGE.md)。
+
+JSON 路徑沿用原契約：內容已是 Y-up 公尺，**不再**套來源單位或軸向。檔名若剛好是 `box`、`convex`、`convex-mesh` 或 `none`，加上 `./` 表明是路徑。自動模式遇到空模型或非有限座標會失敗（exit 1）。
 
 `tests/test_any2nif_collision.py` 以真 CLI 產出 NIF，再讀取其中的碰撞頂點與 render mesh，檢查單位／軸向一致；遊戲中能否站立仍需實機驗收。
 

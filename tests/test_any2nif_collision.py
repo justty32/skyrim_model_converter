@@ -80,7 +80,7 @@ def test_degenerate_convex_is_rejected(points):
         collision_hulls("convex", [_mesh(points)])
 
 
-@pytest.mark.parametrize("mode", ["box", "convex"])
+@pytest.mark.parametrize("mode", ["box", "convex", "convex-mesh"])
 @pytest.mark.parametrize("points", [[], [(float("nan"), 0, 0)] * 4,
                                    [(float("inf"), 0, 0)] * 4])
 def test_unusable_geometry_is_rejected(mode, points):
@@ -97,6 +97,37 @@ def test_none_and_json_keep_existing_contract(tmp_path):
     hull, = collision_hulls(str(source), [])
     np.testing.assert_allclose(hull.vertices.min(axis=0), [0, -1, 0])
     np.testing.assert_allclose(hull.vertices.max(axis=0), [1, 0, 1])
+
+
+def test_per_mesh_convex_preserves_doorway_between_touching_parts():
+    meshes = []
+    for origin, size in [((0, 0, 0), (0.4, 2, 0.4)),
+                         ((1.6, 0, 0), (0.4, 2, 0.4)),
+                         ((0.4, 1.6, 0), (1.2, 0.4, 0.4))]:
+        points = [tuple(origin[i] + p[i] * size[i] for i in range(3)) for p in CUBE_POS]
+        meshes.append(Mesh(positions=points, triangles=CUBE_TRIS))
+    hulls = collision_hulls("convex-mesh", meshes)
+    assert len(hulls) == 3
+    doorway = np.array([1.0, -0.2, 0.8])  # Havok Z-up metres
+
+    def contains(hull, point):
+        return all(point @ normal + offset <= 1e-8 for normal, offset in hull.planes)
+
+    assert not any(contains(hull, doorway) for hull in hulls)
+    assert contains(collision_hulls("convex", meshes)[0], doorway)
+    for mesh, hull in zip(meshes, hulls):
+        points = np.asarray(mesh.positions)[:, [0, 2, 1]]
+        points[:, 1] *= -1
+        assert all(contains(hull, point) for point in points)
+
+
+def test_per_mesh_convex_rejects_bad_part_instead_of_dropping_collision():
+    good = Mesh(positions=CUBE_POS, triangles=CUBE_TRIS)
+    bad = Mesh(name="broken_leg", positions=[(0, 0, 0)] * 3, triangles=[(0, 1, 2)])
+    with pytest.raises(AnyError, match="mesh 1.*broken_leg"):
+        collision_hulls("convex-mesh", [good, bad])
+    with pytest.raises(AnyError, match="no meshes"):
+        collision_hulls("convex-mesh", [])
 
 
 def _read_collision_vertices(data):
@@ -158,3 +189,76 @@ def test_real_cli_convex_collision(tmp_path):
     assert len(collision) == 8
     np.testing.assert_allclose(collision.min(axis=0), [0, -1, 0])
     np.testing.assert_allclose(collision.max(axis=0), [1, 0, 1])
+
+
+def test_package_per_mesh_hulls_follow_instances_and_preserve_gap(tmp_path):
+    from any2nif.cli import main
+    from any2nif.package import MANIFEST
+
+    source = tmp_path / "parts.gltf"
+    write_gltf_interleaved(source.as_posix(), [{
+        "positions": [(x * 100, y * 100, z * 100) for x, y, z in CUBE_POS],
+        "normals": [(0, 1, 0)] * 8, "uvs": [(0, 0)] * 8, "triangles": CUBE_TRIS,
+    }])
+    doc = json.loads(source.read_text())
+    # Two instances of ONE source mesh must produce two independent hulls.
+    doc["nodes"].append({"mesh": 0, "translation": [300, 0, 0]})
+    doc["scenes"][0]["nodes"].append(1)
+    source.write_text(json.dumps(doc))
+    output = tmp_path / "data"
+    args = [str(source), str(output), "--package", "--collision", "convex-mesh",
+            "--unit", "cm", "--scale", "2", "--up-axis", "z"]
+    assert main(args) == 0
+    manifest = json.loads((output / MANIFEST).read_text())
+    assert manifest["collision"] == "convex-mesh"
+    assert manifest["textures"]
+    data = (output / manifest["mesh"]).read_bytes()
+    header = _read_header(_Reader(data))
+    hull_refs = [i for i, kind in enumerate(header["types"]) if kind == "bhkConvexVerticesShape"]
+    assert len(hull_refs) == 2
+    list_ref = header["types"].index("bhkListShape")
+    reader = _Reader(data)
+    reader.seek(header["offsets"][list_ref])
+    assert reader.u32() == 2
+    assert [reader.i32(), reader.i32()] == hull_refs
+    rb_ref = header["types"].index("bhkRigidBody")
+    reader.seek(header["offsets"][rb_ref])
+    assert reader.i32() == list_ref
+    points = _read_collision_vertices(data)
+    assert len(points) == 16
+    np.testing.assert_allclose(points[:8].min(axis=0), [0, 0, 0])
+    np.testing.assert_allclose(points[:8].max(axis=0), [2, 2, 2])
+    np.testing.assert_allclose(points[8:].min(axis=0), [6, 0, 0])
+    np.testing.assert_allclose(points[8:].max(axis=0), [8, 2, 2])
+    # A bad additional part must not publish a package with missing collision.
+    snapshot = {p.relative_to(output): p.read_bytes() for p in output.rglob("*") if p.is_file()}
+    doc["nodes"][1]["scale"] = [0, 0, 0]
+    source.write_text(json.dumps(doc))
+    assert main(args) != 0
+    assert {p.relative_to(output): p.read_bytes() for p in output.rglob("*") if p.is_file()} == snapshot
+
+
+def test_large_source_primitive_keeps_one_hull_after_render_splitting(tmp_path):
+    from any2nif.cli import main
+    from any2nif.package import MANIFEST
+
+    count = 65_538
+    positions = [CUBE_POS[i % 8] for i in range(count)]
+    triangles = [(i, i + 1, i + 2) for i in range(0, count, 3)]
+    source = tmp_path / "large.gltf"
+    write_gltf_interleaved(source.as_posix(), [{
+        "positions": positions, "normals": [(0, 1, 0)] * count,
+        "uvs": [(0, 0)] * count, "triangles": triangles,
+    }])
+    output = tmp_path / "data"
+    assert main([str(source), str(output), "--package", "--collision", "convex-mesh"]) == 0
+    manifest = json.loads((output / MANIFEST).read_text())
+    data = (output / manifest["mesh"]).read_bytes()
+    types = _read_header(_Reader(data))["types"]
+    assert types.count("BSTriShape") == 2
+    assert types.count("bhkConvexVerticesShape") == 1
+    assert "bhkListShape" not in types
+    assert sum(len(mesh.triangles) for mesh in read_nif(data)) == len(triangles)
+    points = _read_collision_vertices(data)
+    np.testing.assert_allclose(points.min(axis=0), [0, -1, 0])
+    np.testing.assert_allclose(points.max(axis=0), [1, 0, 1])

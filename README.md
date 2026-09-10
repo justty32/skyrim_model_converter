@@ -19,7 +19,7 @@
 python -m any2nif crate.glb output/Crate --package
 ```
 
-`output/Crate` 是可交給 ModForge 或放進 mod 的 Data 內容：模型在 `meshes/any2nif/crate/crate.nif`，DDS 在 `textures/any2nif/crate/`，`converter-package.json` 記錄檔案與雜湊。預設自動產生凸包碰撞；箱子可改 `--collision box`，純展示物可用 `--collision none`。來源是公分或 Z-up 時加 `--unit cm --up-axis z`；想自己取輸出名稱則加 `--asset-name my_crate`。
+`output/Crate` 是可交給 ModForge 或放進 mod 的 Data 內容：模型在 `meshes/any2nif/crate/crate.nif`，DDS 在 `textures/any2nif/crate/`，`converter-package.json` 記錄檔案與雜湊。預設自動產生凸包碰撞；已分件模型可用 `--collision convex-mesh` 保留零件間空隙；箱子可改 `--collision box`，純展示物可用 `--collision none`。來源是公分或 Z-up 時加 `--unit cm --up-axis z`；想自己取輸出名稱則加 `--asset-name my_crate`。
 
 整包模式會補沒有名字的材質、分開同名材質、烘入 diffuse 顏色，並檢查模型引用的每張 DDS 都存在、符合 BC1/BC3 與完整 mipmap。先在暫存目錄轉好並驗證才發布；失敗保留前一版。重跑可替換本工具產生且未被手動修改的整包，其他目錄或手改成品會拒絕覆蓋。
 
@@ -76,7 +76,7 @@ MVP 已改自寫純 Python 後端（見下「實作」節），不再依賴外�
 
 **格式來源**：niftools/nifxml `nif.xml`（逐欄查證，非憑記憶；reference 檔 gitignore）。
 **跑**：`python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt`，然後 `python -m nif2gltf --in foo.nif --out foo.gltf --flat`。
-**測**：`.venv/Scripts/python -m pytest`（**303 passed**，2026-09-10 以 `.venv-wsl/bin/python -m pytest -q` 實跑；包含真 FBX2glTF）。
+**測**：`.venv/Scripts/python -m pytest`（**310 passed**，2026-09-10 以 `.venv-wsl/bin/python -m pytest -q` 實跑；包含真 FBX2glTF）。
 跨 repo live consumer 測試在同層
 `../godot-worldspace-editor/tests/test_model_fetch_contract.py`：production CLI 的 synthetic
 NIF `.gltf + .bin` 會由 Godot 4.6 production `ModelFetch._load_gltf()` 真正載入，並驗
@@ -105,7 +105,7 @@ python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--coll
 | `any2nif/cli.py` | CLI 編排：單位／軸向、貼圖、碰撞、PBR 材質與 NIF 寫出；exit 0/1/2/3。 |
 | `any2nif/normalize.py` | 依副檔名分派：glTF/GLB 直通，OBJ/STL/PLY/DAE/ZAE/OFF/DXF/XYZ 走 trimesh，FBX 走 FBX2glTF。 |
 | `any2nif/trimesh_backend.py`、`fbx_backend.py` | 將非 glTF 來源正規化成 GLB，保留可用的 mesh／material 資訊。 |
-| `any2nif/collision.py` | `none`／自動 box、convex／既有 hulls JSON；`tests/test_any2nif_collision.py` 驗真 CLI 碰撞尺度、平面加厚與大型 mesh。 |
+| `any2nif/collision.py` | `none`／自動 box、convex、convex-mesh／既有 hulls JSON；`tests/test_any2nif_collision.py` 驗真 CLI 碰撞尺度、平面加厚與大型 mesh。 |
 | `any2nif/mesh_split.py` | 依 NIF 每 shape 的 65,535 頂點上限自動切分，保留材質／頂點資料與三角形順序；`tests/test_any2nif_mesh_split.py` 驗大型 mesh 真 NIF 讀回與資料拒絕。 |
 | `any2nif/package.py` | 完整 Data 目錄暫存、DDS 格式／引用驗證、manifest、發布／回復；`tests/test_any2nif_package.py` 跨格式真 CLI、所有貼圖槽與失敗保留驗證。 |
 | `any2nif/package_materials.py` | 自包含 glTF、安全獨立材質名、缺圖拒絕、diffuse RGB 烘焙；`tests/test_package_materials.py` 驗外部／GLB／data URI 影像與材質限制。 |
@@ -125,7 +125,7 @@ python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--coll
 
 ## Open
 
-本輪進度與測試環境見 [SESSION-LOG.md](SESSION-LOG.md)。一般靜態物件可加 `--collision box|convex` 自動產生碰撞，或以 `--package` 一次轉完整模型與 DDS；詳細規則見 [PACKAGE.md](PACKAGE.md)。凹形碰撞自動拆分尚未完成。
+本輪進度與測試環境見 [SESSION-LOG.md](SESSION-LOG.md)。一般靜態物件可加 `--collision box|convex|convex-mesh` 自動產生碰撞，或以 `--package` 一次轉完整模型與 DDS；詳細規則見 [PACKAGE.md](PACKAGE.md)。凹形碰撞自動拆分尚未完成。
 
 - **反向產出實機驗證**（**待主力機**）：`gltf2nif` 輸出的 `.nif`（含碰撞）進遊戲測試 cell，確認看得到、站得上去。離線 round-trip + 對 vanilla byte 核已過，剩實機 acceptance。
 - **LE 真檔驗證**（待主力機）：SSE 真實石頭／松樹經 `nif2gltf` → Godot 的形狀與 diffuse 已於 2026-06-18 確認，見 [既有驗收紀錄](../ModForge/wait_todo/worldspace-editor.md)。LE 格式仍缺真檔取樣；這份歷史結果不代表今天新增的正向整包或碰撞已經實機驗過。

@@ -17,11 +17,20 @@ python -m any2nif chair.glb output/Chair --package
 | 選項 | 結果 |
 |---|---|
 | `--collision convex` | 整包預設。一個包住所有三角形的凸包；比盒子貼合外形，但填滿凹槽、門洞與內部空間。 |
+| `--collision convex-mesh` | 每個來源網格各自產生凸包，可保留分件之間的空隙。 |
 | `--collision box` | 包住全部模型的盒狀碰撞，適合箱子、柱子。每軸至少厚 5 公分。 |
 | `--collision none` | 不產生碰撞，適合只看不碰的展示物。 |
 | `--collision hulls.json` | 使用自行準備的多凸包。JSON 已是 Y-up 公尺，不再套來源單位／軸向；適合需要保留空洞的手工拆分。 |
 
 自動碰撞使用已套完 node transform、單位、縮放與軸向的模型，僅收三角形實際使用的頂點。平面凸包會沿法線前後各加厚 2.5 公分；點、線等無法形成外殼的輸入會報錯。碰撞保持 Havok 公尺，不套 render 的 70.03 倍。
+
+`convex-mesh` 適合已分成桌面／桌腳、左右門柱／橫樑等網格的模型：
+
+```bash
+python -m any2nif doorway.glb output/Doorway --package --collision convex-mesh
+```
+
+分組以正規化後的每個 node × primitive 為準，同一網格的不同擺放也各自產生碰撞。超過 65,535 頂點而切出的 NIF shape 不會增加凸包數量。來源若把整扇門框合成單一 primitive，仍會填滿門洞；材質分區也可能將一個物件分成多個 primitive。這個選項沿用來源分件，不會自動將凹形網格拆成凸塊。任何分件退化或無法產生凸包時，整包失敗並保留舊成品。
 
 ## 貼圖與材質
 
@@ -47,13 +56,13 @@ diffuse 輸出 BC1／BC3；normal 會先將 `normalTexture.scale` 烘進法線�
 
 ## Manifest
 
-`converter-package.json` 使用 `schema: "model-converter-package/1"`。`mesh` 是相對 Data 目錄的 NIF 路徑；`collision` 是 `none`、`box`、`convex` 或 `json`；`textures` 記 NIF 實際引用的 texture 路徑；`sha256` 將每個產物的相對路徑對應 SHA-256，不含 manifest 自己。
+`converter-package.json` 使用 `schema: "model-converter-package/1"`。`mesh` 是相對 Data 目錄的 NIF 路徑；`collision` 是 `none`、`box`、`convex`、`convex-mesh` 或 `json`；`textures` 記 NIF 實際引用的 texture 路徑；`sha256` 將每個產物的相對路徑對應 SHA-256，不含 manifest 自己。
 
 Manifest 證明的是離線產物與檔案一致性，不是遊戲內驗收。回到有 Skyrim 的機器，仍要檢查模型方向／大小、顏色／透明／發光，以及碰撞是否能阻擋角色；公司 WSL 不會把這些標成已通過。
 
 ## 驗證入口
 
-`tests/test_any2nif_package.py` 跑真 CLI、多種來源格式、模型讀回、所有 DDS 槽位與發布失敗回復；`tests/test_package_materials.py` 驗影像來源、命名、顏色與拒絕條件；`tests/test_any2nif_collision.py` 驗凸包、盒子、尺度、平面與大型模型。
+`tests/test_any2nif_package.py` 跑真 CLI、多種來源格式、模型讀回、所有 DDS 槽位與發布失敗回復；`tests/test_package_materials.py` 驗影像來源、命名、顏色與拒絕條件；`tests/test_any2nif_collision.py` 驗凸包、盒子、分件空隙、NIF 多凸包引用、尺度、平面與大型模型。
 
 ```bash
 .venv-wsl/bin/python -m pytest -q

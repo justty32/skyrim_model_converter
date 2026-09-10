@@ -71,8 +71,9 @@ def build_parser() -> argparse.ArgumentParser:
                         help="source unit: m (default), cm, mm, in, ft")
     parser.add_argument("--up-axis", default="y", choices=("y", "z"),
                         help="up axis of the SOURCE file (default y, the glTF convention)")
-    parser.add_argument("--collision", metavar="none|box|convex|HULLS_JSON",
-                        help="none (default, package: convex), automatic box/convex hull, or hulls JSON")
+    parser.add_argument("--collision", metavar="none|box|convex|convex-mesh|HULLS_JSON",
+                        help="none (default, package: convex), box, whole-model convex, "
+                             "convex-mesh (one hull per source primitive), or hulls JSON")
     parser.add_argument("--root-name", default="Scene Root", help="root NiNode name")
     parser.add_argument("--fbx2gltf", help="path to the FBX2glTF binary (FBX input only)")
     parser.add_argument("--no-materials", action="store_true",
@@ -126,6 +127,7 @@ def main(argv: list[str] | None = None) -> int:
 
         try:
             transform.apply(meshes, scale=scale, up_axis=args.up_axis)
+            collision_meshes = meshes  # Keep source groups before NIF vertex-limit batching.
             meshes = split_meshes(meshes)
         except AnyError as exc:
             print(f"error: {args.in_path}: {exc}", file=sys.stderr)
@@ -150,7 +152,7 @@ def main(argv: list[str] | None = None) -> int:
         hulls = None
         if args.collision:
             try:
-                hulls = collision_hulls(args.collision, meshes)
+                hulls = collision_hulls(args.collision, collision_meshes)
             except (AnyError, GltfError, OSError, ValueError) as exc:
                 print(f"error: collision {args.collision}: {exc}", file=sys.stderr)
                 return 1

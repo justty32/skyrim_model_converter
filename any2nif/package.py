@@ -16,6 +16,7 @@ from nif2gltf._binreader import _Reader
 from nif2gltf.nif_reader import _read_header, read_nif
 
 from .errors import AnyError
+from .collision import AUTO_MODES
 from .normalize import normalize_to_gltf
 
 MANIFEST = "converter-package.json"
@@ -145,7 +146,7 @@ def convert_package(args):
             files = {p.relative_to(data_dir).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                      for p in sorted(data_dir.rglob("*")) if p.is_file()}
             manifest = {"schema": SCHEMA, "mesh": nif.relative_to(data_dir).as_posix(),
-                        "collision": collision if collision in ("none", "box", "convex") else "json",
+                        "collision": collision if collision == "none" or collision in AUTO_MODES else "json",
                         "textures": refs, "sha256": files}
             (data_dir / MANIFEST).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
             # Build failures leave the existing package untouched. Publish failure
