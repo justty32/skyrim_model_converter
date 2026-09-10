@@ -4,6 +4,8 @@
 
 ## 取得成品
 
+2026-09-10 最新可攜帶批次是 `backend/home-validation/20260910-160024-009333/`。請取這一批的 `sheenchair_1024.zip`（約 4.08 MB）與 `sheenchair_2048.zip`（約 8.69 MB），連同說明、署名、報告與 `SHA256SUMS` 一起帶走；較早批次缺少最後的法線接縫修正。
+
 公司已產出的整個 `backend/home-validation/` 批次資料夾可直接帶回家；其中兩個 ZIP 各自是 Data 內容，解開後最上層是 `meshes`、`textures`、`converter-package.json`。素材和 ZIP 沒有進 Git，**只 pull 不會拿到成品**。也可在家用專案自己的 Python 環境重建：
 
 ```bash

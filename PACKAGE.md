@@ -44,6 +44,8 @@ PLY 等 trimesh 來源的頂點顏色會保留到 NIF。來源按面指定顏色
 
 diffuse 的 RGB 顏色倍率會在線性色彩空間乘上原圖，再轉回 sRGB。沒有 diffuse 的材質會產生純色圖；沒有材質的 primitive 使用白色圖。Alpha 倍率保留給 NIF 材質，避免在貼圖和材質各乘一次。
 
+`MASK` 使用 alpha test、關閉混合，保留大於等於門檻的像素；依 [NifTools AlphaFlags／TestFunction](https://github.com/niftools/nifxml/blob/develop/nif.xml) 寫出 0x1A00。門檻為 `ceil(clamp(alphaCutoff, 0, 1) × 255)`；cutoff 大於 1 時使用 NEVER 比較，整個材質透明，符合 [glTF cutoff 定義](https://raw.githubusercontent.com/KhronosGroup/glTF/main/specification/2.0/schema/material.schema.json)。NIF 的 8-bit 門檻、DDS 壓縮與遊戲濾波仍有量化誤差。舊版 MASK 的 0x0201 實際開啟混合且比較為 ALWAYS，這類模型需重轉。BLEND 與明確指定的原始 flags／threshold 維持既有行為。
+
 diffuse 輸出 BC1／BC3；normal 會先將 `normalTexture.scale` 烘進法線的 X／Y 分量並重新正規化，再使用 BC3 並翻轉綠色通道；specular 與 emissive 輸出 BC1。全部生成二次方尺寸與完整 mipmap。輸出後重新讀取 NIF 的 `BSShaderTextureSet`，逐一核對檔案存在、DDS 編碼、完整 mip 資料長度，並由 Pillow 解碼。
 
 傳統 Skyrim 材質不是完整 PBR。Metallic／roughness 以既有公式近似，roughness 影像反相為 specular mask；`KHR_materials_specular` 有提供時優先採用。True PBR、材質的完全等價轉換與凹形碰撞自動拆分仍未實作。骨架、動畫、morph 與 sparse accessor 沿用靜態後端的拒絕規則。

@@ -17,6 +17,8 @@ Block plan:
 
 from __future__ import annotations
 
+from math import ceil
+
 import numpy as np
 
 from ._binwriter import _Writer
@@ -101,21 +103,14 @@ _LSP_LIGHTING_EFFECT_1 = 0.3
 _LSP_LIGHTING_EFFECT_2 = 2.0
 _TEX_CLAMP_WRAP = 3  # WRAP_S_WRAP_T
 
-# --- NiAlphaProperty flag words (nif.xml AlphaFlags bitfield) ---
-#   bit0      alpha blend enable
-#   bits1-4   source blend mode      (6 = SRC_ALPHA)
-#   bits5-8   destination blend mode (7 = INV_SRC_ALPHA)
-#   bit9      alpha test enable
-#   bits10-12 alpha test function    (4 = GREATER)
-# BLEND: 0x00ED = blend on | src SRC_ALPHA (6<<1=0x0C) | dst INV_SRC_ALPHA (7<<5=0xE0)
-#        -> 0x01 | 0x0C | 0xE0 = 0xED. This is the value every vanilla alpha-blended
-#        SSE mesh (glass, foliage billboards) carries.
-# MASK : 0x0201 = alpha test on (0x200) | test function GREATER (0<<10) ... plus bit0.
-#        Vanilla alpha-TEST meshes (tree leaves) ship 0x0201: the low bit is set even
-#        though the blend is a no-op, matching the engine's own files, and the cutoff
-#        lives in Threshold. Keeping byte parity with vanilla beats deriving it.
+# --- NiAlphaProperty flags: niftools/nifxml AlphaFlags and TestFunction ---
+# https://github.com/niftools/nifxml/blob/develop/nif.xml
+# BLEND: bit 0 on, source SRC_ALPHA (6 << 1), destination INV_SRC_ALPHA (7 << 5).
+# MASK: blend off, test on (1 << 9), GREATER_EQUAL (6 << 10).
+# glTF discards values below the cutoff, retaining equality, including cutoff 0/1.
 _ALPHA_FLAGS_BLEND = 0x00ED
-_ALPHA_FLAGS_MASK = 0x0201
+_ALPHA_FLAGS_MASK = 0x1A00
+_ALPHA_FLAGS_MASK_NEVER = 0x1E00  # glTF cutoff > 1: no alpha can pass.
 
 # --- Havok constants (static, immovable). Enum values from nif.xml. ---
 _HAVOK_MAT_STONE = 3741512247   # SKY_HAV_MAT_STONE
@@ -378,9 +373,11 @@ def _alpha_settings(spec: MaterialSpec | None) -> tuple[int, int] | None:
                      else int(spec.alpha_threshold_override))
         return flags, threshold
     if mode == "MASK":
-        flags = (_ALPHA_FLAGS_MASK if spec.alpha_flags_override is None
+        default_flags = (_ALPHA_FLAGS_MASK_NEVER if float(spec.alpha_cutoff) > 1.0
+                         else _ALPHA_FLAGS_MASK)
+        flags = (default_flags if spec.alpha_flags_override is None
                  else int(spec.alpha_flags_override))
-        threshold = (int(round(_clamp01(float(spec.alpha_cutoff)) * 255.0))
+        threshold = (ceil(_clamp01(float(spec.alpha_cutoff)) * 255.0)
                      if spec.alpha_threshold_override is None
                      else int(spec.alpha_threshold_override))
         return flags, threshold
@@ -390,11 +387,7 @@ def _alpha_settings(spec: MaterialSpec | None) -> tuple[int, int] | None:
 def _build_alpha_property(name_idx: int, flags: int, threshold: int) -> bytes:
     """NiAlphaProperty = NiObjectNET header + Flags(u16) + Threshold(u8) = 15 bytes.
 
-    Deliberately conservative on the shader side: we set NO extra SLSF1 bit. In
-    SkyrimShaderPropertyFlags1, 0x1000 is Model_Space_Normals (NOT an alpha flag) and
-    0x8 is Vertex_Alpha (which would read a vertex-colour channel this writer never
-    emits) -- setting either would be a visual bug. Alpha behaviour in SSE is driven
-    by the NiAlphaProperty block itself, so the ref + this block are enough.
+    Shader flags are configured separately in the shader property builders.
     """
     w = _Writer()
     w.u32(name_idx)          # Name

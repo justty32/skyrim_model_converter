@@ -367,11 +367,21 @@ def test_mask_material_encodes_the_cutoff_as_the_threshold():
     data = build_nif([_tri()], TEXPREFIX, [True],
                      material_specs=[_spec(alpha_mode="MASK", alpha_cutoff=0.5)])
     flags, threshold = _alpha_block(data)
-    assert flags == 0x0201
-    assert threshold == 128  # round(0.5 * 255)
+    assert flags == 0x1A00
+    assert threshold == 128  # ceil(0.5 * 255)
     data2 = build_nif([_tri()], TEXPREFIX, [True],
                       material_specs=[_spec(alpha_mode="MASK", alpha_cutoff=1.0)])
     assert _alpha_block(data2)[1] == 255
+    data3 = build_nif([_tri()], TEXPREFIX, [True],
+                      material_specs=[_spec(alpha_mode="MASK", alpha_cutoff=0.499)])
+    assert _alpha_block(data3)[1] == 128  # alpha byte 127 is still below cutoff.
+    data4 = build_nif([_tri()], TEXPREFIX, [True],
+                      material_specs=[_spec(alpha_mode="MASK", alpha_cutoff=1.1)])
+    flags4, threshold4 = _alpha_block(data4)
+    assert not flags4 & 1
+    assert flags4 & (1 << 9)
+    assert (flags4 >> 10) & 7 == 7  # nif.xml TEST_NEVER
+    assert threshold4 == 255
 
 
 def test_alpha_flags_and_threshold_can_use_dsport_overrides():
@@ -557,5 +567,5 @@ def test_specs_for_meshes_end_to_end_drives_the_writer(tmp_path):
     assert not _lsp_u32(data, 16, index=1) & 0x1
     assert not _lsp_u32(data, 20, index=1) & 0x10
     off = _block_offsets(data, "NiAlphaProperty")[1]
-    assert struct.unpack_from("<H", data, off + 12)[0] == 0x0201
-    assert data[off + 14] == 64  # round(0.25 * 255)
+    assert struct.unpack_from("<H", data, off + 12)[0] == 0x1A00
+    assert data[off + 14] == 64  # ceil(0.25 * 255)
