@@ -228,10 +228,12 @@ def test_vertex_colors_use_32_byte_vertices_and_enable_shader_flag():
     shape = _block_offsets(data, "BSTriShape")[0]
     vertex_desc = struct.unpack_from("<Q", data, shape + 100)[0]
     assert (vertex_desc & 0xF) * 4 == 32
-    assert (vertex_desc >> 44) & 0x200
+    assert (vertex_desc >> 44) & 0x20
+    assert not (vertex_desc >> 44) & 0x200  # Instance, not Vertex_Colors.
     assert ((vertex_desc >> 24) & 0xF) * 4 == 28
     assert data[shape + 116 + 28:shape + 116 + 32] == bytes((255, 0, 128, 64))
-    assert _lsp_u32(data, 20) & 0x80
+    assert _lsp_u32(data, 20) & 0x20
+    assert not _lsp_u32(data, 20) & 0x80  # Assume_Shadowmask is unrelated.
 
 
 def test_gltf_reader_accepts_normalized_unsigned_byte_color_0(tmp_path):

@@ -81,3 +81,19 @@ def test_blended_effect_enables_vertex_alpha_shader_flag():
     header = _header(data)
     offset = header["offsets"][header["types"].index("BSEffectShaderProperty")]
     assert struct.unpack_from("<I", data, offset + 16)[0] & 0x8
+
+
+def test_colored_effect_uses_nif_schema_vertex_color_bits():
+    mesh = _mesh()
+    mesh.colors = [(1, 0, 0, 1), (0, 1, 0, .5), (0, 0, 1, 0)]
+    data = build_nif([mesh], r"textures\test", [False],
+                     material_specs=[MaterialSpec(shader_kind="effect")])
+    header = _header(data)
+    shape = header["offsets"][header["types"].index("BSTriShape")]
+    effect = header["offsets"][header["types"].index("BSEffectShaderProperty")]
+    desc, = struct.unpack_from("<Q", data, shape + 100)
+    assert (desc >> 44) & 0x20  # nif.xml VertexAttribute.Vertex_Colors.
+    assert not (desc >> 44) & 0x200  # Instance.
+    flags2, = struct.unpack_from("<I", data, effect + 20)
+    assert flags2 & 0x20  # SkyrimShaderPropertyFlags2.Vertex_Colors.
+    assert not flags2 & 0x80  # Assume_Shadowmask.

@@ -21,7 +21,7 @@ BSEffectShaderProperty instead of the lighting property plus texture set. An
 empty normal name, None alpha overrides, and `shader_kind="lighting"` retain the
 old paths. BLEND automatically enables SLSF1_Vertex_Alpha. Vertex colours live
 on `geometry.Mesh`; when present, the writer selects the 32-byte vertex layout
-and enables the project-required SLSF2_Vertex_Colors flag.
+and enables the SLSF2_Vertex_Colors flag defined by nif.xml.
 """
 
 from __future__ import annotations

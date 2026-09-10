@@ -43,7 +43,9 @@ BS_VERSION = 100  # Skyrim Special Edition
 #     but WITHOUT the VF_FULLPREC(0x400) attribute bit — vanilla omits it and nif2gltf
 #     infers precision from the UV offset >= 12, so we omit it too for a byte match). ---
 _VF_VERTEX, _VF_UV, _VF_NORMALS, _VF_TANGENTS = 0x1, 0x2, 0x8, 0x10
-_VF_COLORS = 0x200
+# niftools/nifxml nif.xml: VertexAttribute.Vertex_Colors is bit 5; bit 9 is Instance.
+# https://github.com/niftools/nifxml/blob/develop/nif.xml
+_VF_COLORS = 0x20
 _STRIDE = 28
 _UV_OFFSET, _NRM_OFFSET, _TAN_OFFSET = 16, 20, 24
 _ATTRS = _VF_VERTEX | _VF_UV | _VF_NORMALS | _VF_TANGENTS  # 0x1B
@@ -90,6 +92,7 @@ _LSP_SHADER_FLAGS2_BASE = 0x00008021
 _SLSF1_SPECULAR = 0x00000001
 _SLSF1_VERTEX_ALPHA = 0x00000008
 _SLSF2_DOUBLE_SIDED = 0x00000010
+_SLSF2_VERTEX_COLORS = 0x00000020  # SkyrimShaderPropertyFlags2 bit 5, not Assume_Shadowmask bit 7.
 _LSP_SHADER_FLAGS2 = _LSP_SHADER_FLAGS2_BASE | _SLSF2_DOUBLE_SIDED
 _LSP_GLOSSINESS = 80.0
 _LSP_SPEC_STRENGTH = 1.0
@@ -257,7 +260,7 @@ def _build_lsp(name_idx: int, texset_ref: int, spec: MaterialSpec | None = None,
                *, has_vertex_colors: bool = False) -> bytes:
     """BSLightingShaderProperty (100 bytes, Default shader type).
 
-    With `spec is None` every field is the historical constant, so the bytes are
+    With `spec is None` and no vertex colours, fields are the historical constants; bytes are
     identical to what this writer has always produced (the backward-compat gate).
 
     With a MaterialSpec, glTF metallic/roughness PBR is folded into Skyrim's
@@ -296,7 +299,7 @@ def _build_lsp(name_idx: int, texset_ref: int, spec: MaterialSpec | None = None,
         if (spec.alpha_mode or "OPAQUE").upper() == "BLEND":
             flags1 |= _SLSF1_VERTEX_ALPHA
     if has_vertex_colors:
-        flags2 |= 0x00000080  # SLSF2_Vertex_Colors
+        flags2 |= _SLSF2_VERTEX_COLORS
 
     w = _Writer()
     w.u32(name_idx)              # +0  Name
@@ -334,7 +337,7 @@ def _build_esp(name_idx: int, source_texture: str, spec: MaterialSpec,
     if (spec.alpha_mode or "OPAQUE").upper() == "BLEND":
         flags1 |= _SLSF1_VERTEX_ALPHA
     if has_vertex_colors:
-        flags2 |= 0x00000080  # Project contract: SLSF2_Vertex_Colors.
+        flags2 |= _SLSF2_VERTEX_COLORS
 
     w = _Writer()
     # Inherited BSShaderProperty/NiObjectNET prefix, same BSVersion-100 layout as LSP.
@@ -538,7 +541,7 @@ def build_nif(meshes: list[Mesh], texprefix: str, normal_map_flags: list[bool],
     parameters above are a frozen cross-process contract (darksouls-port calls this
     build as a subprocess). When it is None -- or every entry is None -- the output
     is byte-for-byte what it has always been for legacy meshes (no authored tangents
-    and uv_handedness=False).
+    and uv_handedness=False, without vertex colours).
     Entries align positionally with
     `meshes`; a None entry means "that shape keeps the static defaults".
     """

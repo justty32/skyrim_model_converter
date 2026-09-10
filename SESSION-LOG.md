@@ -6,7 +6,7 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 2026-09-10 trimesh 場景擺放修正完成：重新包 GLB 時保留來源節點的累積變換與重複擺放，不再把所有零件重置到原點。真 DAE fixture 包含旋轉／位移父層和鏡射／不等比縮放子層，驗逐面三角形角點、winding／normal 與實際整包的兩個分件凸包位置。恢復舊 fresh-Scene 行為的反例讓兩項新測試均失敗。完整 suite **480 passed**，SheenChair GLB 路徑不受此次非 glTF 匯入修正影響。
 
-[feature-dev] open：已實測紅色 PLY 在 trimesh 匯入後 COLOR_0 消失；下一步保留來源頂點／面顏色。Done when: 真 PLY 顏色經 GLB／整包 NIF 保留、沒有來源顏色的模型維持原行為，測試與文件對齊並 push。
+2026-09-10 PLY 顏色與 NIF 顏色標記修正完成：trimesh 匯入保留顯式頂點 RGBA，面色拆開共用頂點並保留原平滑法線，不把隱含灰色當來源顏色。真 ASCII PLY 測試驗 normalized GLB 與實際 package 的 RGBA、色界、幾何／法線及無色來源；舊 ColorVisuals 替換反例確實失敗。另依 [NifTools nif.xml](https://github.com/niftools/nifxml/blob/develop/nif.xml) 修正 VertexAttribute 與 SkyrimShaderPropertyFlags2 的 Vertex_Colors 為 bit 5（0x20），不再誤設 Instance（0x200）／Assume_Shadowmask（0x80）。Lighting／Effect 與 PLY 測試直接讀 NIF descriptor、RGBA bytes 與 shader flags，不依賴本工具 reader 的顏色解碼。完整 suite **484 passed**，無頂點色的 legacy NIF 雜湊基準仍通過；舊彩色 NIF 需重轉，實機顏色驗收記在母 repo WAIT_USER。SheenChair 四個來源 primitive 均無頂點色，最新驗收批次可沿用。
 
 2026-09-10 高面數模型切分修正完成：NIF 三角形數也是 16-bit，舊流程只查頂點數，65,536 面寫出後會讀回 0 面。any2nif 現在同時按頂點與面數切分，裸 writer 超限明確拒絕。33,489 頂點／66,248 面的共用頂點網格驗實際 NIF 逐角點、材質與切線；33,153 頂點／65,536 面的完整 package 驗 65,535＋1 面、DDS 解碼與單一來源凸包的邊界。恢復舊切分的反例確實變紅，完整 suite **478 passed**。SheenChair 各分件低於門檻，最新驗收批次仍為下列 160024 批，不需因此換包。
 
@@ -40,9 +40,9 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 本次獨立 WSL 環境在 `.venv-wsl`，由既有 uv 建立；FBX2glTF 在忽略的 `tools/bin/`。Windows `.venv` 保留。使用者已授權專案內安裝依賴與 push。
 
-驗證：`.venv-wsl/bin/python -m pytest -q --disable-warnings` → **480 passed、零 skipped**；包含真 FBX2glTF、跨格式完整 Data 目錄、所有 DDS 槽位、65535 頂點切分、負縮放、錯誤資料與發布／回復。仍有既有套件的 deprecation warnings。
+驗證：`.venv-wsl/bin/python -m pytest -q --disable-warnings` → **484 passed、零 skipped**；包含真 FBX2glTF、跨格式完整 Data 目錄、所有 DDS 槽位、65535 頂點切分、負縮放、錯誤資料與發布／回復。仍有既有套件的 deprecation warnings。
 
-跨 repo darksouls-port live contract 再次嘗試：`.venv-wsl/bin/python -m unittest discover -s ../darksouls-port/tests -p test_model_converter_contract.py -v`，其 `initial_state.py` import 仍缺少 soulstruct，測試未能啟動。本輪 writer 新增可選 authored tangents，但裸 reader 預設不啟用；既有單／雙 shape 的 NIF SHA-256 基準與新 opt-in 隔離測試通過。未改 darksouls-port，不能把本 repo 測試當成跨 repo live contract 已通過。
+跨 repo darksouls-port live contract 先前嘗試：`.venv-wsl/bin/python -m unittest discover -s ../darksouls-port/tests -p test_model_converter_contract.py -v`，其 `initial_state.py` import 仍缺少 soulstruct，測試未能啟動。前輪 writer 新增可選 authored tangents，但裸 reader 預設不啟用；既有單／雙 shape 的 NIF SHA-256 基準與新 opt-in 隔離測試通過。未改 darksouls-port，不能把本 repo 測試當成跨 repo live contract 已通過。
 
 ## 後續方向
 

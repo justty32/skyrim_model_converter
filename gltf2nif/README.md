@@ -52,7 +52,8 @@ glTF (x, y, z)  →  Skyrim (x, −z, y)            # normal / 平面（方向�
 
   `BSVertexDesc` = `0x0001b000_00650407`（VertexDataSize=7、UV off=4、Normal off=5、Tangent off=6、attributes `VF_VERTEX|VF_UV|VF_NORMALS|VF_TANGENTS`=0x1B）。**刻意不設 `VF_FULLPREC`（0x400）旗標**——真實 vanilla 靜態也不設，靠 UV offset≥12 自描述判 float3（`nif2gltf` 就是這樣推的），這樣位元組與 vanilla 一致。
 - `Data Size` = `stride × numVerts + numTris × 6`（含頂點與三角資料，對過 vanilla）。
-- normals：glTF 有就帶、沒有就算面法線（area-weighted）。裸命令預設仍用 Lengyel 法從 UV 現算 tangent frame。`any2nif` 透過 `read_gltf(..., preserve_tangents=True)` 啟用來源 TANGENT，存進 `Mesh.tangents`；[tangents.py](tangents.py) 處理驗證、node transform 與 handedness，writer 保留該方向。無來源切線時，any2nif 設 `Mesh.uv_handedness=True`，由 `prepare_tangent_frames` 拆開相反 UV 手性的共用頂點並生成 TANGENT，再做大型 mesh 切分。reader 與 Mesh 的選項預設皆 False，沒有 authored tangents 且未啟用 UV handedness 的舊 Mesh 維持原本輸出；替代 UV／atlas 預處理仍只由整包入口負責。
+- normals：glTF 有就帶、沒有就算面法線（area-weighted）。裸命令預設仍用 Lengyel 法從 UV 現算 tangent frame。`any2nif` 透過 `read_gltf(..., preserve_tangents=True)` 啟用來源 TANGENT，存進 `Mesh.tangents`；[tangents.py](tangents.py) 處理驗證、node transform 與 handedness，writer 保留該方向。無來源切線時，any2nif 設 `Mesh.uv_handedness=True`，由 `prepare_tangent_frames` 拆開相反 UV 手性的共用頂點並生成 TANGENT，再做大型 mesh 切分。reader 與 Mesh 的選項預設皆 False，沒有 authored tangents／頂點色且未啟用 UV handedness 的舊 Mesh 維持原本輸出；替代 UV／atlas 預處理仍只由整包入口負責。
+- 頂點色使用 32-byte stride、offset 28 的 RGBA，VertexAttribute.Vertex_Colors 與 SLSF2_Vertex_Colors 都是 bit 5（0x20），依 [nif.xml](https://github.com/niftools/nifxml/blob/develop/nif.xml)。舊版誤用的 0x200／0x80 已修正；無頂點色的裸命令位元組基準維持不變。
 - **限制**：SSE `BSTriShape` 的頂點/三角數是 16-bit，單一 shape 上限各為 65535 頂點與三角形；超過會報錯（請在上游切 mesh）。
 
 ## 材質：`BSLightingShaderProperty` + `BSShaderTextureSet`

@@ -36,6 +36,8 @@ python -m any2nif doorway.glb output/Doorway --package --collision convex-mesh
 
 ## 貼圖與材質
 
+PLY 等 trimesh 來源的頂點顏色會保留到 NIF。來源按面指定顏色時，會先拆開共用頂點，避免相鄰面的顏色被平均混合；三角形位置與原本法線保留。沒有來源顏色時不額外加入預設灰色。這只保留顏色資料，透明混合仍由材質的 alpha 設定決定。NIF 的 VertexAttribute 與 SkyrimShaderPropertyFlags2 顏色標記皆使用 bit 5（0x20），依 [NifTools 格式定義](https://github.com/niftools/nifxml/blob/develop/nif.xml)；舊版誤用的 Instance／Assume_Shadowmask 位元已修正。
+
 每個材質會取得 `material_0000` 這類獨立名稱，來源的空名、同名或路徑字串不會造成互相覆蓋。glTF／GLB 內嵌、data URI、外部影像都會先讀取；指定卻缺失或壞掉的影像會報錯，整包不發布。
 
 diffuse 的 RGB 顏色倍率會在線性色彩空間乘上原圖，再轉回 sRGB。沒有 diffuse 的材質會產生純色圖；沒有材質的 primitive 使用白色圖。Alpha 倍率保留給 NIF 材質，避免在貼圖和材質各乘一次。

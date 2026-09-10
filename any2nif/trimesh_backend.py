@@ -119,10 +119,23 @@ def _assign_materials_and_pack(trimesh, mesh_geoms: dict, stem: str, *, source_s
         final_name = source_name or (stem if not multi else f"{stem}_{index}")
 
         if material is None or isinstance(visual, ColorVisuals):
-            # STL/PLY/OFF etc with no material at all (plain ColorVisuals) - give
-            # it a name-only material so gltf_reader still gets a usable base name.
+            # Keep explicit colours; ColorVisuals also supplies implicit grey
+            # defaults for uncoloured geometry, which must not become COLOR_0.
+            colors = None
+            if visual.kind == "face":
+                colors = visual.face_colors.copy().repeat(3, axis=0)
+                # Face colours cannot share a vertex across differently coloured
+                # faces. Preserve the original smooth normals when duplicating.
+                normals = geom.vertex_normals.copy()[geom.faces.reshape(-1)]
+                geom.unmerge_vertices()
+                geom.vertex_normals = normals
+            elif visual.kind == "vertex":
+                colors = visual.vertex_colors.copy()
             uv = getattr(visual, "uv", None)
             geom.visual = TextureVisuals(uv=uv, material=PBRMaterial(name=final_name))
+            if colors is not None:
+                # trimesh's glTF exporter maps this attribute to core COLOR_0.
+                geom.visual.vertex_attributes["color"] = colors
         elif isinstance(material, PBRMaterial):
             material.name = final_name
         else:
