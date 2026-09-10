@@ -18,11 +18,13 @@ import shutil
 import sys
 import tempfile
 
-from gltf2nif import GltfError, build_nif, load_hulls, read_gltf
+from gltf2nif import GltfError, build_nif, read_gltf
 from gltf2nif.gltf_reader import probe_normal_map
 
 from . import transform
+from .collision import collision_hulls
 from .errors import AnyError
+from .mesh_split import split_meshes
 from .normalize import SUPPORTED_EXTENSIONS, normalize_to_gltf
 
 DEFAULT_TEXPREFIX = "textures\\any2nif"
@@ -41,15 +43,9 @@ def _build(meshes, texprefix, normal_flags, hulls, root_name, material_specs):
 
 
 def _material_specs(gltf_path: str, meshes):
-    """Read PBR material specs for each mesh, if gltf2nif.material is available."""
-    try:
-        from gltf2nif.material import specs_for_meshes
-    except ImportError:
-        return None
-    try:
-        return specs_for_meshes(gltf_path, meshes)
-    except Exception:  # noqa: BLE001 - material extraction must never sink a conversion
-        return None
+    """Read PBR specs without silently replacing malformed material data."""
+    from gltf2nif.material import specs_for_meshes
+    return specs_for_meshes(gltf_path, meshes)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -61,6 +57,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("in_path", help="source model (%s)" %
                         ", ".join(sorted(SUPPORTED_EXTENSIONS)))
     parser.add_argument("out_path", help="target .nif")
+    parser.add_argument("--package", action="store_true",
+                        help="write a complete Data directory at out_path (meshes, textures, collision)")
+    parser.add_argument("--asset-name", help="package mesh/texture subpath name (default: source stem)")
     parser.add_argument("--textures-out", metavar="DIR",
                         help="write the source's textures here as .dds (BC1/BC3 + mipmaps)")
     parser.add_argument("--texprefix", default=DEFAULT_TEXPREFIX,
@@ -72,7 +71,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="source unit: m (default), cm, mm, in, ft")
     parser.add_argument("--up-axis", default="y", choices=("y", "z"),
                         help="up axis of the SOURCE file (default y, the glTF convention)")
-    parser.add_argument("--collision", help="hulls JSON -> bhkConvexVerticesShape collision")
+    parser.add_argument("--collision", metavar="none|box|convex|HULLS_JSON",
+                        help="none (default, package: convex), automatic box/convex hull, or hulls JSON")
     parser.add_argument("--root-name", default="Scene Root", help="root NiNode name")
     parser.add_argument("--fbx2gltf", help="path to the FBX2glTF binary (FBX input only)")
     parser.add_argument("--no-materials", action="store_true",
@@ -85,6 +85,13 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     args = build_parser().parse_args(argv)
+
+    if args.package:
+        from .package import convert_package
+        return convert_package(args)
+    if args.asset_name:
+        print("error: --asset-name requires --package", file=sys.stderr)
+        return 1
 
     if not os.path.isfile(args.in_path):
         print(f"error: cannot read source: {args.in_path}", file=sys.stderr)
@@ -117,7 +124,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: {args.in_path}: {exc}", file=sys.stderr)
             return 1
 
-        transform.apply(meshes, scale=scale, up_axis=args.up_axis)
+        try:
+            transform.apply(meshes, scale=scale, up_axis=args.up_axis)
+            meshes = split_meshes(meshes)
+        except AnyError as exc:
+            print(f"error: {args.in_path}: {exc}", file=sys.stderr)
+            return exc.code
 
         gltf_dir = os.path.dirname(os.path.abspath(gltf_path))
         written: dict[str, dict[str, str]] = {}
@@ -138,12 +150,22 @@ def main(argv: list[str] | None = None) -> int:
         hulls = None
         if args.collision:
             try:
-                hulls = load_hulls(args.collision)
-            except (GltfError, OSError, ValueError) as exc:
+                hulls = collision_hulls(args.collision, meshes)
+            except (AnyError, GltfError, OSError, ValueError) as exc:
                 print(f"error: collision {args.collision}: {exc}", file=sys.stderr)
                 return 1
 
-        specs = None if args.no_materials else _material_specs(gltf_path, meshes)
+        try:
+            specs = None if args.no_materials else _material_specs(gltf_path, meshes)
+        except (ValueError, TypeError, KeyError, IndexError) as exc:
+            print(f"parse error: material: {exc}", file=sys.stderr)
+            return 2
+        if specs is not None and args.textures_out:
+            for mesh, spec in zip(meshes, specs):
+                if spec is not None:
+                    slots = written.get(mesh.material, {})
+                    spec.has_specular_map = bool(slots.get("specular"))
+                    spec.has_emissive_map = bool(slots.get("emissive"))
 
         try:
             data = _build(meshes, args.texprefix, normal_flags, hulls, args.root_name, specs)

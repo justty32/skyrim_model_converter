@@ -2,9 +2,9 @@
 
 ← [README](README.md)
 
-**狀態：契約已實作（2026-06-17）。** 契約形狀已定，且**參考後端已自寫**＝本 repo 的 `nif2gltf` Python 模組（LE+SSE 靜態 mesh、`--flat`、batch manifest，23 測綠）；不再依賴 NifSkope。本檔定義「呼叫方看到什麼」，與用哪個後端解耦——後端換掉，契約不動。**唯一未竟＝對真實 vanilla `.nif` 的 byte 驗證**（離線無素材，見 README Open / WAIT_USER）。
+**狀態（2026-09-10）**：已實作 `nif2gltf`、`gltf2nif`、`any2nif` 與 `tex2dds`。本檔定義呼叫方看到的 CLI 契約；後端留在獨立 repo。真實模型與遊戲碰撞驗收、反向貼圖、蒙皮等未完項目見 [README 的 Open](README.md#open)。
 
-## 定位（照 [skyrim-voicegen](../ModForge/sub_projs/skyrim-voicegen/README.md) 的掛法）
+## 定位（照 [skyrim-voicegen](../skyrim-voicegen/README.md) 的掛法）
 
 model-converter 是**黑盒 exec**，不整合進 ModForge / Godot editor。掛勾＝環境變數 **`MODFORGE_NIF2GLTF_BIN`**，指向一支 wrapper（在自己的 venv / 環境內跑選定後端）。呼叫方只給 args、只收 glTF；轉換器只看 args、不認得呼叫方。**互不整合。**
 
@@ -17,11 +17,11 @@ fallback（`model-converter/.venv/.../python -m nif2gltf`）。明示但不存�
 driver  ──(--in foo.nif --out foo.gltf [--flat])──►  nif2gltf  ──► writes foo.gltf (+ .bin/貼圖)
 ```
 
-`driver` 可以是 Godot worldspace editor 的前置腳本、ModForge、或人工。轉換器的職責**只有一件**：一個 `.nif` → 一個 `.gltf`。
+`driver` 可以是 Godot worldspace editor 的前置腳本、ModForge、或人工。這個掛勾的職責是一個 `.nif` → 一個 `.gltf`；正向模型與貼圖轉換另由下方 `gltf2nif`、`any2nif`、`tex2dds` 契約承接。
 
 ## MVP 範圍（鎖定，對齊 README）
 
-靜態 mesh、Linux 原生、**`--flat` 跳紋理用平色**，輸出餵 [worldspace editor](../godot-worldspace-editor/README.md) 當物件代理（目前是彩色方塊 placeholder，換成真實 glTF）。蒙皮 / 紋理 round-trip / 反向（glTF→nif）皆 **MVP 後**。
+靜態 mesh、Linux 原生、**`--flat` 跳紋理用平色**，輸出餵 [worldspace editor](../godot-worldspace-editor/README.md) 當物件代理（目前是彩色方塊 placeholder，換成真實 glTF）。蒙皮與紋理 round-trip 仍未完成；反向（glTF→nif）已由下方 `gltf2nif` 實作。
 
 ## CLI 契約
 
@@ -96,7 +96,7 @@ python ..\godot-worldspace-editor\tests\test_model_fetch_contract.py
 
 ## 反向命令：glTF → NIF（`gltf2nif`，2026-07-05）
 
-nif→glTF 的鏡像方向，供 [darksouls-port](../ModForge/sub_projs/darksouls-port/plan.md) 的資產移植管線消費。**dumb 工具**：一個 glTF → 一個 `.nif`，不認呼叫方、不讀 ESM。參考後端＝本 repo 的 `gltf2nif` Python 模組（欄位表與選值見 [gltf2nif/README.md](gltf2nif/README.md)）。
+nif→glTF 的鏡像方向，供 [darksouls-port](../darksouls-port/plan.md) 的資產移植管線消費。**dumb 工具**：一個 glTF → 一個 `.nif`，不認呼叫方、不讀 ESM。參考後端＝本 repo 的 `gltf2nif` Python 模組（欄位表與選值見 [gltf2nif/README.md](gltf2nif/README.md)）。
 
 ```
 gltf2nif <in.gltf> <out.nif> [--texprefix <textures\prefix>] [--collision <hulls.json>] [--root-name <name>]
@@ -131,7 +131,7 @@ usage: any2nif [-h] [--textures-out DIR] [--texprefix TEXPREFIX] [--scale SCALE]
 | `--scale SCALE` | | 額外套用的均勻座標縮放；與 `--unit` 相乘。 |
 | `--unit UNIT` | | 來源單位；`m`（預設）、`cm`、`mm`、`in`、`ft`，先換算成公尺。 |
 | `--up-axis {y,z}` | | 來源檔的 up axis；預設 `y`，`z` 會轉成 glTF Y-up。 |
-| `--collision COLLISION` | | hulls JSON → `bhkConvexVerticesShape` 碰撞。 |
+| `--collision COLLISION` | | `none`（單檔預設無碰撞）、`box`（盒狀）、`convex`（外形凸包），或既有 hulls JSON 路徑；整包預設 `convex`。 |
 | `--root-name ROOT_NAME` | | 根 `NiNode` 名；預設 `Scene Root`。 |
 | `--fbx2gltf FBX2GLTF` | | FBX 輸入專用的 FBX2glTF binary 路徑。 |
 | `--no-materials` | | 忽略來源 PBR 材質值，使用 `gltf2nif` 靜態預設值。 |
@@ -144,7 +144,25 @@ usage: any2nif [-h] [--textures-out DIR] [--texprefix TEXPREFIX] [--scale SCALE]
 | 2 | 來源格式或 glTF 解析失敗；`argparse` 命令列用法錯誤亦回傳 2。 |
 | 3 | 來源含 skin、morph 或動畫，靜態後端拒絕。 |
 
-**輸出保證**：成功時產出 Skyrim SSE `.nif`；來源先統一為 glTF Y-up／公尺，再由 `gltf2nif` 轉成 Skyrim Z-up units。每個 glTF primitive 對應一個 `BSTriShape`；指定 `--textures-out` 時另寫來源可解出的 diffuse／normal／specular DDS，指定 `--keep-intermediate` 時保留正規化結果。
+**輸出保證**：成功時產出 Skyrim SSE `.nif`；來源先統一為 glTF Y-up／公尺，再由 `gltf2nif` 轉成 Skyrim Z-up units。每個 glTF primitive 通常對應一個 `BSTriShape`；超過 65,535 頂點時自動分成多個 shape，保留原三角形與各頂點資料；指定 `--textures-out` 時另寫來源可解出的 diffuse／normal／specular／emissive DDS，指定 `--keep-intermediate` 時保留正規化結果。
+
+### 自動盒狀碰撞
+
+```bash
+python -m any2nif crate.glb crate.nif --collision box
+```
+
+`box` 將所有 mesh 中三角形用到的頂點合併計算邊界，使用套完 node transform、`--unit`、`--scale` 與 `--up-axis` 的座標。產出一個盒狀 `bhkConvexVerticesShape`，碰撞頂點保持 Havok 公尺，僅旋轉到 Z-up，不套 render 的 70.03 倍。任一軸不足 5 公分時，向兩側等量補到 5 公分，避免平面物件沒有碰撞厚度。它會填滿模型內部空洞，適合箱子等簡單物件；若要沿模型外形包覆可用 `convex`：SciPy 計算一個外殼，不填盒子多出來的角，但仍會填凹洞。平面沿法線加厚 5 公分，點／線退化會拒絕；凹形自動拆分仍未完成。
+
+JSON 路徑沿用原契約：內容已是 Y-up 公尺，**不再**套來源單位或軸向。檔名若剛好是 `box`、`convex` 或 `none`，加上 `./` 表明是路徑。自動模式遇到空模型或非有限座標會失敗（exit 1）。
+
+`tests/test_any2nif_collision.py` 以真 CLI 產出 NIF，再讀取其中的碰撞頂點與 render mesh，檢查單位／軸向一致；遊戲中能否站立仍需實機驗收。
+
+### 整包模式
+
+`any2nif <source> <output-directory> --package [--asset-name NAME]` 將 `out_path` 解讀為完整 Data 目錄。模型／貼圖位置由同一個名稱計算；不接受另外的 `--textures-out`、`--texprefix`、`--keep-intermediate`。來源尺度／軸向與 collision JSON 保持前述契約。名稱會正規化成 ASCII 小寫，Windows 保留名稱拒絕。
+
+`--package` 的材質處理、發布與 `model-converter-package/1` manifest 契約見 [PACKAGE.md](PACKAGE.md)；單檔模式不能使用 `--asset-name`。
 
 ## 貼圖編碼：`tex2dds`
 

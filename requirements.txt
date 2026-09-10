@@ -1,5 +1,6 @@
 # Core
 numpy>=2.4.6
+scipy>=1.18.1
 pygltflib>=1.16.5
 
 # Forward optional (OBJ/STL/PLY/DAE)

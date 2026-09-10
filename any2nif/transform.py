@@ -9,6 +9,10 @@ under contract (darksouls-port) and must not change.
 
 from __future__ import annotations
 
+import math
+
+from .errors import AnyError
+
 # Multiplier from the named unit to metres.
 UNIT_SCALES = {
     "m": 1.0, "metre": 1.0, "meter": 1.0,
@@ -25,11 +29,15 @@ def resolve_scale(unit: str | None, scale: float | None) -> float:
     if unit:
         key = unit.strip().lower()
         if key not in UNIT_SCALES:
-            from .errors import AnyError
             raise AnyError(f"unknown --unit {unit!r}; known: {', '.join(sorted(UNIT_SCALES))}")
         factor *= UNIT_SCALES[key]
     if scale is not None:
-        factor *= float(scale)
+        extra = float(scale)
+        if not math.isfinite(extra) or extra == 0.0:
+            raise AnyError("--scale must be a finite, non-zero number")
+        factor *= extra
+    if not math.isfinite(factor) or factor == 0.0:
+        raise AnyError("--unit and --scale must produce a finite, non-zero scale")
     return factor
 
 
@@ -43,12 +51,12 @@ def apply(meshes, *, scale: float = 1.0, up_axis: str = "y"):
     """Rotate/scale Mesh IR in place-ish (returns the same list) into glTF convention.
 
     up_axis names the convention of the SOURCE file: "y" (already glTF-like, no-op)
-    or "z" (Blender/OBJ-from-CAD style). Scaling touches positions only; normals are
-    unit directions and only need the rotation.
+    or "z" (Blender/OBJ-from-CAD style). Positive scaling touches positions only;
+    normals are unit directions and only need the rotation. Negative uniform scaling
+    mirrors the mesh, so it also reverses normals and triangle winding.
     """
     up = (up_axis or "y").strip().lower()
     if up not in ("y", "z"):
-        from .errors import AnyError
         raise AnyError(f"--up-axis must be 'y' or 'z', got {up_axis!r}")
     rotate = up == "z"
     if not rotate and scale == 1.0:
@@ -60,4 +68,8 @@ def apply(meshes, *, scale: float = 1.0, up_axis: str = "y"):
                 mesh.normals = [_zup_to_yup(n) for n in mesh.normals]
         if scale != 1.0:
             mesh.positions = [(x * scale, y * scale, z * scale) for x, y, z in mesh.positions]
+            if scale < 0.0:
+                if mesh.normals:
+                    mesh.normals = [(-x, -y, -z) for x, y, z in mesh.normals]
+                mesh.triangles = [(a, c, b) for a, b, c in mesh.triangles]
     return meshes

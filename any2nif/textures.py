@@ -185,6 +185,9 @@ def export_textures(gltf_path: str, out_dir: str, *, codec: str = "auto") -> dic
             ("specular", f"{base}_s.dds",
              _specular_source(gltf, material, buffers, gltf_dir),
              {"fmt": "bc1"}),
+            ("emissive", f"{base}_g.dds",
+             _texture_image(gltf, buffers, gltf_dir, _tex_index(material, "emissiveTexture")),
+             {"fmt": "bc1"}),
         )
         for slot, filename, pixels, options in jobs:
             if pixels is None:

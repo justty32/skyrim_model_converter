@@ -11,6 +11,30 @@
 - **model-porting**（[workflows/idea/asset-pipelines/model-porting](../ModForge/workflows/idea/asset-pipelines/model-porting/README.md)）已把**正向**（外部 FBX/OBJ/glTF → `.nif`）規劃得很深，但**只有正向**。
 - 兩者其實是同一把工具的兩個方向。與其各做各的，不如收斂成一個轉換器，正向沿用 model-porting 的決策、反向補上。
 
+## 一條命令轉成完整資產目錄
+
+在專案環境已裝好依賴後：
+
+```bash
+python -m any2nif crate.glb output/Crate --package
+```
+
+`output/Crate` 是可交給 ModForge 或放進 mod 的 Data 內容：模型在 `meshes/any2nif/crate/crate.nif`，DDS 在 `textures/any2nif/crate/`，`converter-package.json` 記錄檔案與雜湊。預設自動產生凸包碰撞；箱子可改 `--collision box`，純展示物可用 `--collision none`。來源是公分或 Z-up 時加 `--unit cm --up-axis z`；想自己取輸出名稱則加 `--asset-name my_crate`。
+
+整包模式會補沒有名字的材質、分開同名材質、烘入 diffuse 顏色，並檢查模型引用的每張 DDS 都存在、符合 BC1/BC3 與完整 mipmap。先在暫存目錄轉好並驗證才發布；失敗保留前一版。重跑可替換本工具產生且未被手動修改的整包，其他目錄或手改成品會拒絕覆蓋。
+
+凸包會填滿模型的凹洞；它不是建築室內的精細碰撞。Skyrim 傳統材質是 PBR 的近似，True PBR 與蒙皮不在這條流程內。完整規則與目前不支援的材質設定見 [PACKAGE.md](PACKAGE.md)。本輪離線測試不能代替遊戲中的外觀與站立驗收。
+
+WSL 可用本機已有的 `uv` 建獨立環境：
+
+```bash
+uv venv .venv-wsl
+uv pip install --python .venv-wsl/bin/python -r requirements.txt
+.venv-wsl/bin/python -m any2nif crate.glb output/Crate --package
+```
+
+FBX 另跑 `./tools/fetch_fbx2gltf.sh`，會下載至本專案忽略的 `tools/bin/`；其他格式不需要它。原有直接輸出 `.nif` 的用法仍可使用。
+
 ---
 
 ## 關係定位（不重造輪子）
@@ -52,12 +76,12 @@ MVP 已改自寫純 Python 後端（見下「實作」節），不再依賴外�
 
 **格式來源**：niftools/nifxml `nif.xml`（逐欄查證，非憑記憶；reference 檔 gitignore）。
 **跑**：`python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt`，然後 `python -m nif2gltf --in foo.nif --out foo.gltf --flat`。
-**測**：`.venv/Scripts/python -m pytest`（**202 passed**，2026-09-05 實跑）。
+**測**：`.venv/Scripts/python -m pytest`（**296 passed**，2026-09-10 以 `.venv-wsl/bin/python -m pytest -q` 實跑；包含真 FBX2glTF）。
 跨 repo live consumer 測試在同層
 `../godot-worldspace-editor/tests/test_model_fetch_contract.py`：production CLI 的 synthetic
 NIF `.gltf + .bin` 會由 Godot 4.6 production `ModelFetch._load_gltf()` 真正載入，並驗
 mesh/primitive/vertices/軸向尺度與 fail-closed；詳 [PROTOCOL](PROTOCOL.md#live-consumer-contract)。
-⚠️ **離線限制**：合成 fixture 只證「reader 讀回它照 nif.xml 編的東西」，**未對真實 vanilla `.nif` 逐 byte 驗**（離線無遊戲素材）——SSE offset 解碼尤其需真檔確認，列 WAIT_USER。
+**驗證範圍**：合成 fixture 驗解析與寫出契約；SSE 真實石頭／松樹已有 [Godot GUI 歷史驗收](../ModForge/wait_todo/worldspace-editor.md)，LE 真檔與本輪正向整包實機仍待驗。
 
 ## 實作（`gltf2nif/` — 反向後端，2026-07-05）
 
@@ -70,7 +94,7 @@ python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--coll
 - **幾何** `BSTriShape`（full-precision 佈局 stride 28，座標 glTF Y-up 公尺 → Skyrim Z-up ×70.03）
 - **材質** `BSLightingShaderProperty`+`BSShaderTextureSet`（material 基名 → `<texprefix>\<基名>.dds` + 探測到的 `_n` normal map）
 - **碰撞** `--collision` hulls JSON → `bhkCollisionObject→bhkRigidBody→bhkListShape→bhkConvexVerticesShape`（Havok 公尺、不乘 70；STATIC/STONE/MOTION_FIXED）
-- 服務 [darksouls-port](../ModForge/sub_projs/darksouls-port/plan.md) 的 `FLVER→glTF→NIF` 管線；m0046B1A18 實件已跑（5 shape / 1684 tri / 64 KB，round-trip 位置誤差 ~1.7e-6 m）。
+- 服務 [darksouls-port](../darksouls-port/plan.md) 的 `FLVER→glTF→NIF` 管線；m0046B1A18 實件已跑（5 shape / 1684 tri / 64 KB，round-trip 位置誤差 ~1.7e-6 m）。
 
 ## 實作（`any2nif/` — 正向入口）
 
@@ -81,7 +105,11 @@ python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--coll
 | `any2nif/cli.py` | CLI 編排：單位／軸向、貼圖、碰撞、PBR 材質與 NIF 寫出；exit 0/1/2/3。 |
 | `any2nif/normalize.py` | 依副檔名分派：glTF/GLB 直通，OBJ/STL/PLY/DAE/ZAE/OFF/DXF/XYZ 走 trimesh，FBX 走 FBX2glTF。 |
 | `any2nif/trimesh_backend.py`、`fbx_backend.py` | 將非 glTF 來源正規化成 GLB，保留可用的 mesh／material 資訊。 |
-| `any2nif/transform.py` | 將來源單位換算成公尺，並把來源 Z-up 正規化成 glTF Y-up。 |
+| `any2nif/collision.py` | `none`／自動 box、convex／既有 hulls JSON；`tests/test_any2nif_collision.py` 驗真 CLI 碰撞尺度、平面加厚與大型 mesh。 |
+| `any2nif/mesh_split.py` | 依 NIF 每 shape 的 65,535 頂點上限自動切分，保留材質／頂點資料與三角形順序；`tests/test_any2nif_mesh_split.py` 驗大型 mesh 真 NIF 讀回與資料拒絕。 |
+| `any2nif/package.py` | 完整 Data 目錄暫存、DDS 格式／引用驗證、manifest、發布／回復；`tests/test_any2nif_package.py` 跨格式真 CLI、所有貼圖槽與失敗保留驗證。 |
+| `any2nif/package_materials.py` | 自包含 glTF、安全獨立材質名、缺圖拒絕、diffuse RGB 烘焙；`tests/test_package_materials.py` 驗外部／GLB／data URI 影像與材質限制。 |
+| `any2nif/transform.py` | 將來源單位換算成公尺，並把來源 Z-up 正規化成 glTF Y-up；`tests/test_any2nif_transform.py` 驗無效縮放拒絕與負縮放的法線／繞向。 |
 | `any2nif/textures.py` | glTF 圖像轉 Skyrim diffuse／normal／specular `.dds` 槽位。 |
 
 ## 實作（`tex2dds/` — 貼圖編碼）
@@ -97,8 +125,10 @@ python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--coll
 
 ## Open
 
+本輪進度與測試環境見 [SESSION-LOG.md](SESSION-LOG.md)。一般靜態物件可加 `--collision box|convex` 自動產生碰撞，或以 `--package` 一次轉完整模型與 DDS；詳細規則見 [PACKAGE.md](PACKAGE.md)。凹形碰撞自動拆分尚未完成。
+
 - **反向產出實機驗證**（**待主力機**）：`gltf2nif` 輸出的 `.nif`（含碰撞）進遊戲測試 cell，確認看得到、站得上去。離線 round-trip + 對 vanilla byte 核已過，剩實機 acceptance。
-- **對真實 vanilla `.nif` 驗證載體**（MVP 收尾，**待主力機**）：跑 `nif2gltf` 轉真實 vanilla mesh（LE 與 SSE 各取樣），確認 glTF 進 Godot/Blender 形狀對；SSE 半精度 offset 解碼是最需驗的點。見 WAIT_USER。
+- **LE 真檔驗證**（待主力機）：SSE 真實石頭／松樹經 `nif2gltf` → Godot 的形狀與 diffuse 已於 2026-06-18 確認，見 [既有驗收紀錄](../ModForge/wait_todo/worldspace-editor.md)。LE 格式仍缺真檔取樣；這份歷史結果不代表今天新增的正向整包或碰撞已經實機驗過。
 - ~~**批量 nif→glTF 的可行載體**~~ ✅ 自寫 `nif2gltf`（上節），不再卡 NifSkope。
 - ~~**協議形狀**~~ ✅ 草案 2026-06-17 [PROTOCOL.md](PROTOCOL.md)：掛勾 `MODFORGE_NIF2GLTF_BIN`（黑盒 exec）、單檔 `--in/--out/--flat`、批量 `manifest.json`、exit code。**參考後端＝本 repo 的 `nif2gltf`**（wrapper 呼 `python -m nif2gltf`）；契約 backend-agnostic，要換後端不動契約。
 - ~~**與 model-porting 的邊界**~~ ✅ 選型細節留在 model-porting／[AUDIT.md](AUDIT.md)，本 repo 收斂可執行的正反向工具與 CLI 契約。
