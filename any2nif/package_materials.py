@@ -151,33 +151,6 @@ def _field(info, name, default=None):
 def _validate_texture_metadata(material, material_index: int) -> None:
     """Reject sampling metadata the current NIF/DDS pipeline would silently discard."""
     for slot, info in _material_texture_infos(material):
-        tex_coord = _field(info, "texCoord", 0)
-        if tex_coord not in (None, 0):
-            raise AnyError(
-                f"material {material_index} {slot} uses TEXCOORD_{tex_coord}; "
-                "only TEXCOORD_0 is supported",
-                code=2,
-            )
-        extensions = _field(info, "extensions", {}) or {}
-        transform = extensions.get("KHR_texture_transform")
-        if transform is not None:
-            if not isinstance(transform, dict):
-                raise AnyError(
-                    f"material {material_index} {slot} has malformed KHR_texture_transform",
-                    code=2,
-                )
-            offset = transform.get("offset", [0.0, 0.0])
-            scale = transform.get("scale", [1.0, 1.0])
-            rotation = transform.get("rotation", 0.0)
-            override = transform.get("texCoord", 0)
-            identity = (offset == [0.0, 0.0] and scale == [1.0, 1.0] and
-                        rotation == 0.0 and override in (None, 0))
-            if not identity:
-                raise AnyError(
-                    f"material {material_index} {slot} uses a non-identity "
-                    "KHR_texture_transform, which is not supported",
-                    code=2,
-                )
         if slot == "normalTexture":
             normal_scale = _field(info, "scale", 1.0)
             if normal_scale is not None and (
@@ -305,6 +278,9 @@ def prepare_materials(gltf_path: str, output_path: str) -> str:
             if primitive.material is None:
                 primitive.material = len(gltf.materials)
                 gltf.materials.append(Material())
+    from .package_uv import prepare_uvs
+    prepare_uvs(gltf, buffers)
+
     for index, material in enumerate(gltf.materials):
         _validate_texture_metadata(material, index)
         material.name = f"material_{index:04d}"

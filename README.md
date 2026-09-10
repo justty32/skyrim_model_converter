@@ -76,7 +76,7 @@ MVP 已改自寫純 Python 後端（見下「實作」節），不再依賴外�
 
 **格式來源**：niftools/nifxml `nif.xml`（逐欄查證，非憑記憶；reference 檔 gitignore）。
 **跑**：`python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt`，然後 `python -m nif2gltf --in foo.nif --out foo.gltf --flat`。
-**測**：`.venv/Scripts/python -m pytest`（**310 passed**，2026-09-10 以 `.venv-wsl/bin/python -m pytest -q` 實跑；包含真 FBX2glTF）。
+**測**：`.venv/Scripts/python -m pytest`（**335 passed**，2026-09-10 以 `.venv-wsl/bin/python -m pytest -q` 實跑；包含真 FBX2glTF）。
 跨 repo live consumer 測試在同層
 `../godot-worldspace-editor/tests/test_model_fetch_contract.py`：production CLI 的 synthetic
 NIF `.gltf + .bin` 會由 Godot 4.6 production `ModelFetch._load_gltf()` 真正載入，並驗
@@ -109,6 +109,8 @@ python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--coll
 | `any2nif/mesh_split.py` | 依 NIF 每 shape 的 65,535 頂點上限自動切分，保留材質／頂點資料與三角形順序；`tests/test_any2nif_mesh_split.py` 驗大型 mesh 真 NIF 讀回與資料拒絕。 |
 | `any2nif/package.py` | 完整 Data 目錄暫存、DDS 格式／引用驗證、manifest、發布／回復；`tests/test_any2nif_package.py` 跨格式真 CLI、所有貼圖槽與失敗保留驗證。 |
 | `any2nif/package_materials.py` | 自包含 glTF、安全獨立材質名、缺圖拒絕、diffuse RGB 烘焙；`tests/test_package_materials.py` 驗外部／GLB／data URI 影像與材質限制。 |
+| `any2nif/package_uv.py` | 整包的替代 UV 與共用貼圖變換烘焙、單 UV／法線切線限制；`tests/test_package_uv.py` 讀回 NIF 驗座標與失敗保護。 |
+| `tools/smoke_real_assets.py` | 固定來源與 SHA-256 的公開模型下載／離線試轉，含真實網格 UV 衍生案例；操作與結果見 [REAL-ASSETS.md](REAL-ASSETS.md)。 |
 | `any2nif/transform.py` | 將來源單位換算成公尺，並把來源 Z-up 正規化成 glTF Y-up；`tests/test_any2nif_transform.py` 驗無效縮放拒絕與負縮放的法線／繞向。 |
 | `any2nif/textures.py` | glTF 圖像轉 Skyrim diffuse／normal／specular／emissive `.dds` 槽位；烘焙法線強度。 |
 

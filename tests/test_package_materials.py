@@ -187,9 +187,9 @@ def test_missing_texture_index_is_a_parse_error(tmp_path):
     ({"index": 0, "texCoord": 1}, "TEXCOORD_1"),
     ({"index": 0, "extensions": {"KHR_texture_transform": {
         "offset": [0.25, 0.0],
-    }}}, "non-identity KHR_texture_transform"),
+    }}}, "missing UV accessor"),
 ])
-def test_unsupported_uv_metadata_fails_instead_of_silently_changing_mapping(
+def test_requested_uv_mapping_requires_an_accessor(
         tmp_path, texture_info, message):
     material = {"pbrMetallicRoughness": {"baseColorTexture": texture_info}}
     doc, _ = _document(image_uri=_uri(_png(), "image/png"), materials=[material])

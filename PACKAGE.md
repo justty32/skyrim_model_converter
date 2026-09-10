@@ -44,7 +44,11 @@ diffuse 輸出 BC1／BC3；normal 會先將 `normalTexture.scale` 烘進法線�
 
 法線強度支援 0（消除傾斜）、介於 0 與 1（減弱）、大於 1（加強）及負值（反轉 X／Y）；NaN／Infinity 會報錯。計算依 [glTF normalTexture.scale 定義](https://raw.githubusercontent.com/KhronosGroup/glTF/main/specification/2.0/schema/material.normalTextureInfo.schema.json)，在壓縮前烘焙，因此仍有 DDS 壓縮與濾波誤差。
 
-目前只支援 TEXCOORD_0 與未變換的貼圖座標。非預設 UV 集、非 identity 的 `KHR_texture_transform` 會明確報錯；只靠 image-source extension、沒有一般 `texture.source` 的材質也會報錯。不要將 metadata 還在輸入裡，當成輸出已支援該功能。
+整包支援替代 `TEXCOORD_n`，以及 `KHR_texture_transform` 的位移、旋轉、縮放與 `texCoord` 覆寫。每個材質的各貼圖必須使用相同座標集與變換；轉換器會把結果烘進 NIF 的單一 UV，原始模型不變。變換順序依 [Khronos 規格](https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_texture_transform)：先縮放、再旋轉、最後位移。支援 float 與正規化 unsigned byte／short UV；缺少指定座標、非有限值或超出 NIF 半精度範圍會拒絕。
+
+帶 normal 貼圖時，變換限正值等比縮放與位移，以保留切線方向；旋轉、鏡射、不等比／零縮放仍拒絕。不同貼圖各用不同座標的材質需要先烘成同一組 UV，這輪未提供跨 UV 貼圖重烘。這些新支援只作用於 `--package`；單檔模式的後端仍讀 TEXCOORD_0。只靠 image-source extension、沒有一般 `texture.source` 的材質也仍報錯。
+
+公開真實模型的固定版本、試轉結果與可重跑指令見 [REAL-ASSETS.md](REAL-ASSETS.md)。
 
 ## 重跑與失敗
 
