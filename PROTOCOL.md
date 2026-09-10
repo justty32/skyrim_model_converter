@@ -152,7 +152,7 @@ usage: any2nif [-h] [--textures-out DIR] [--texprefix TEXPREFIX] [--scale SCALE]
 python -m any2nif crate.glb crate.nif --collision box
 ```
 
-`any2nif` 在同時有 NORMAL／TANGENT 時保留來源切線方向與 W 正反手性；node transform、來源軸向、負縮放與大模型切分會同步處理。無效 TANGENT 回 exit 2，缺 NORMAL 時忽略 TANGENT。這不改 `gltf2nif` 裸命令的預設切線算法；內部 `read_gltf(..., preserve_tangents=True)` 由 any2nif 啟用，預設 False。重烘後的 atlas 已清除來源 TANGENT，仍由 writer 產生目標切線。
+`any2nif` 在同時有 NORMAL／TANGENT 時保留來源切線方向與 W 正反手性；node transform、來源軸向、負縮放與大模型切分會同步處理。無效 TANGENT 回 exit 2，缺 NORMAL 時忽略 TANGENT。沒有來源 TANGENT 時也依 UV 正反手性產生切線，支援鏡射 UV，並在正反手性接縫複製頂點；切線先生成再按頂點上限切分，烘焙使用相同的逐角點方向。這不改 `gltf2nif` 裸命令的預設切線算法；內部 `read_gltf(..., preserve_tangents=True)` 由 any2nif 啟用，預設 False。重烘後的 atlas 已清除來源 TANGENT，由 writer 依同一套 UV 正反手性產生目標切線；負縮放直接反映到此方向，不再對烘焙 normal 額外補償 Y。
 
 `box` 將所有 mesh 中三角形用到的頂點合併計算邊界，使用套完 node transform、`--unit`、`--scale` 與 `--up-axis` 的座標。產出一個盒狀 `bhkConvexVerticesShape`，碰撞頂點保持 Havok 公尺，僅旋轉到 Z-up，不套 render 的 70.03 倍。任一軸不足 5 公分時，向兩側等量補到 5 公分，避免平面物件沒有碰撞厚度。它會填滿模型內部空洞，適合箱子等簡單物件；若要沿模型外形包覆可用 `convex`：SciPy 計算一個外殼，不填盒子多出來的角，但仍會填凹洞。平面沿法線加厚 5 公分，點／線退化會拒絕；凹形自動拆分仍未完成。
 

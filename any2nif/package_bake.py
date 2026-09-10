@@ -129,10 +129,10 @@ def _set_image(gltf, payloads, info, pixels, *, srgb=False):
         (info.extensions or {}).pop('KHR_texture_transform', None)
 
 
-def _bake_primitive(gltf, buffers, payloads, primitive, material, size, normal_y_sign):
+def _bake_primitive(gltf, buffers, payloads, primitive, material, size):
     from .texture_sampling import sample_rgba
     from .uv_atlas import generate_atlas, ensure_face_coverage, dilate_pixels
-    from .normal_bake import source_frames, target_corner_frames, interpolate_frames, reorient_normals
+    from .normal_bake import source_corner_frames, target_corner_frames, interpolate_frames, reorient_normals
 
     attrs = primitive.attributes
     positions = np.asarray(_read_accessor(gltf, buffers, attrs.POSITION), dtype=np.float64)
@@ -182,9 +182,10 @@ def _bake_primitive(gltf, buffers, payloads, primitive, material, size, normal_y
             _, _, uv_scale, rotation = _mapping(info, slot)
             c, s = math.cos(rotation), math.sin(rotation)
             uv_matrix = np.diag(uv_scale) @ np.array([[c, s], [-s, c]])
-            src_frames = source_frames(positions, normals, maps[slot][1], triangles,
+            src_frames = source_corner_frames(positions, normals, maps[slot][1], triangles,
                                        tangents=tangents,
-                                       uv_transform=uv_matrix if tangents is not None else None)
+                                       uv_transform=uv_matrix if tangents is not None else None).reshape(-1, 3, 3)
+            src_triangles = np.arange(len(src_frames)).reshape(-1, 3)
             dst_frames = target_corner_frames(positions[vmapping], normals[vmapping],
                                                output_uv, output_triangles).reshape(-1, 3, 3)
             dst_triangles = np.arange(len(dst_frames)).reshape(-1, 3)
@@ -206,11 +207,9 @@ def _bake_primitive(gltf, buffers, payloads, primitive, material, size, normal_y
                 ao = sample_rgba(ao_source[0], ao_uv, **ao_source[1])[:, 0]
                 values[:, :3] *= (1 + strength * (ao - 1))[:, None]
             if slot == 'normalTexture':
-                src = interpolate_frames(src_frames, triangles, face_ids, weights)
+                src = interpolate_frames(src_frames, src_triangles, face_ids, weights)
                 dst = interpolate_frames(dst_frames, dst_triangles, face_ids, weights)
                 values = reorient_normals(values, src, dst, scale=1 if scale is None else scale)
-                if normal_y_sign < 0:
-                    values[:, 1] = 1 - values[:, 1]
             flat_pixels[selected] = values
         if slot == 'normalTexture':
             info.scale = 1.0
@@ -233,7 +232,7 @@ def _bake_primitive(gltf, buffers, payloads, primitive, material, size, normal_y
     primitive.indices = append_accessor(gltf, buffers, output_triangles.reshape(-1), 'SCALAR', indices=True)
 
 
-def bake_material_uvs(gltf, buffers, payloads, *, size=1024, normal_y_sign=1):
+def bake_material_uvs(gltf, buffers, payloads, *, size=1024):
     """Bake conflicting texture mappings (and AO) before shared-UV preparation."""
     if isinstance(size, bool) or size not in (64, 128, 256, 512, 1024, 2048, 4096):
         raise AnyError("UV bake size must be a power of two from 64 to 4096", code=2)
@@ -247,7 +246,7 @@ def bake_material_uvs(gltf, buffers, payloads, *, size=1024, normal_y_sign=1):
             material = copy.deepcopy(originals[mi])
             print(f'baking material {mi}: {size} x {size} UV atlas', file=sys.stderr, flush=True)
             try:
-                _bake_primitive(gltf, buffers, payloads, primitive, material, size, normal_y_sign)
+                _bake_primitive(gltf, buffers, payloads, primitive, material, size)
             except (ValueError, IndexError, TypeError, GltfError) as exc:
                 raise AnyError(f'material {mi}: UV bake: {exc}', code=2) from exc
             if mi in baked:

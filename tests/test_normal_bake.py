@@ -80,17 +80,28 @@ def test_target_frames_exactly_match_writer_basis():
     np.testing.assert_allclose(frames[:, :, 2], NORMALS)
 
 
-def test_target_corner_frames_recomputes_basis_across_writer_split():
+def test_target_corner_frames_separates_mirrored_seam_across_writer_split():
     positions = [(0, 0, 0), (1, 0, 0), (0, 1, 0), (1, 1, 0), (2, 1, 0)]
     normals = [(0, 0, 1)] * 5
     uvs = [(0, 0), (1, 0), (0, 1), (2, 0), (2, 1)]
     triangles = [(0, 1, 2), (1, 3, 4)]
     corners = target_corner_frames(positions, normals, uvs, triangles, max_vertices=4)
     assert corners.shape == (2, 3, 3, 3)
-    # Shared source vertex 1 belongs to separate output pieces.  Its writer
-    # tangent follows each piece's own UV derivative accumulation.
+    # Shared source vertex 1 belongs to opposite UV-handedness groups.
+    # Each group retains its own derivative, including across chunk boundaries.
     assert corners[0, 1, :, 0] == pytest.approx((1, 0, 0))
     assert corners[1, 0, :, 0] == pytest.approx((0, 1, 0))
+
+
+def test_target_corner_frames_keeps_global_smoothing_across_chunk_split():
+    positions = [(0, 0, 0), (1, 0, 0), (0, 1, 0), (1, 1, 0), (2, 1, 0)]
+    normals = [(0, 0, 1)] * 5
+    uvs = [(0, 0), (1, 0), (0, 1), (1, 1), (2, 2)]
+    triangles = [(0, 1, 2), (1, 3, 4)]
+    whole = target_corner_frames(positions, normals, uvs, triangles)
+    split = target_corner_frames(positions, normals, uvs, triangles, max_vertices=4)
+    np.testing.assert_allclose(split, whole)
+    np.testing.assert_allclose(split[0, 1], split[1, 0])
 
 
 def test_reorient_normals_through_ninety_degree_basis():

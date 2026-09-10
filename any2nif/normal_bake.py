@@ -21,6 +21,7 @@ import numpy as np
 
 from gltf2nif.geometry import compute_tangents
 from gltf2nif.geometry import Mesh
+from gltf2nif.tangents import tangent_basis
 
 from .mesh_split import split_meshes
 
@@ -79,6 +80,7 @@ def source_frames(positions, normals, uvs, triangles, tangents=None, uv_transfor
     over adjacent UV triangles and ``uvs`` must already contain the mapped UVs;
     passing ``uv_transform`` on this path is rejected to prevent double mapping.
     The accumulated bitangent determines the sign of ``cross(N, T)``.
+    Use source_corner_frames for generated frames on mirrored shared-vertex seams.
     """
     pos, nrm, tex = _vertices(positions, normals, uvs)
     tri = _triangles(triangles, len(pos))
@@ -142,10 +144,10 @@ def source_frames(positions, normals, uvs, triangles, tangents=None, uv_transfor
 
 
 def target_frames(positions, normals, uvs, triangles):
-    """Return the exact tangent basis chosen by the current BSTriShape writer."""
+    """Return unsplit per-vertex bases; use target_corner_frames for UV seams."""
     pos, nrm, tex = _vertices(positions, normals, uvs)
     tri = _triangles(triangles, len(pos))
-    tangents, bitangents = compute_tangents(pos, nrm, tex, tri)
+    tangents, bitangents = compute_tangents(pos, nrm, tex, tri, preserve_handedness=True)
     frames = np.stack((np.asarray(tangents), np.asarray(bitangents), nrm), axis=2)
     return _normalise_columns(frames, "target frame")
 
@@ -154,18 +156,31 @@ def target_corner_frames(positions, normals, uvs, triangles, max_vertices=65535)
     """Return ``Fx3x3x3`` writer bases after production mesh splitting.
 
     Axes are face, corner, world component, and basis column.  A vertex shared
-    across a split boundary intentionally gets the independently recomputed basis
-    of each output BSTriShape.  Triangle and corner order remain the input order.
+    across opposite UV handedness is duplicated before computing tangents.
+    Chunk splits retain that global basis and the input triangle/corner order.
     """
     pos, nrm, tex = _vertices(positions, normals, uvs)
     tri = _triangles(triangles, len(pos))
     mesh = Mesh(positions=[tuple(v) for v in pos], normals=[tuple(v) for v in nrm],
-                uvs=[tuple(v) for v in tex], triangles=[tuple(map(int, t)) for t in tri])
+                uvs=[tuple(v) for v in tex], triangles=[tuple(map(int, t)) for t in tri],
+                uv_handedness=True)
     corners = []
     for part in split_meshes([mesh], max_vertices=max_vertices):
-        part_frames = target_frames(part.positions, part.normals, part.uvs, part.triangles)
+        tangent, bitangent = tangent_basis(part.tangents, part.normals)
+        part_frames = _normalise_columns(
+            np.stack((tangent, bitangent, np.asarray(part.normals)), axis=2), "target frame")
         corners.append(part_frames[np.asarray(part.triangles, dtype=np.int64)])
     return np.concatenate(corners, axis=0)
+
+
+def source_corner_frames(positions, normals, uvs, triangles, tangents=None, uv_transform=None):
+    """Return source bases per corner, retaining generated mirrored-UV seams."""
+    if tangents is not None:
+        frames = source_frames(positions, normals, uvs, triangles, tangents, uv_transform)
+        return frames[_triangles(triangles, len(frames))]
+    if uv_transform is not None:
+        raise ValueError("uv_transform is only valid with supplied tangents; pass mapped uvs otherwise")
+    return target_corner_frames(positions, normals, uvs, triangles)
 
 
 def interpolate_frames(frames, triangles, face_indices, barycentric):

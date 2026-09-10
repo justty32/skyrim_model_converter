@@ -228,8 +228,7 @@ def _ensure_diffuse(gltf: GLTF2, material, image_payloads: list[tuple[bytes, str
     pbr.baseColorTexture = info
 
 
-def prepare_materials(gltf_path: str, output_path: str, *, bake_size: int = 1024,
-                      normal_y_sign: int = 1) -> str:
+def prepare_materials(gltf_path: str, output_path: str, *, bake_size: int = 1024) -> str:
     """Write and return a self-contained glTF suitable for packaged NIF conversion."""
     if not os.path.isfile(gltf_path):
         raise AnyError(f"cannot read source glTF: {gltf_path}", code=1)
@@ -291,7 +290,7 @@ def prepare_materials(gltf_path: str, output_path: str, *, bake_size: int = 1024
             message = str(exc)
             code = 3 if any(word in message for word in ("skinning", "morph", "animated")) else 2
             raise AnyError(message, code=code) from exc
-    bake_material_uvs(gltf, buffers, payloads, size=bake_size, normal_y_sign=normal_y_sign)
+    bake_material_uvs(gltf, buffers, payloads, size=bake_size)
     from .package_uv import prepare_uvs
     prepare_uvs(gltf, buffers)
 

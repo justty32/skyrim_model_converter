@@ -197,7 +197,8 @@ def _build_bstrishape(name_idx: int, shader_ref: int, mesh: Mesh,
         authored = [(*gltf_to_skyrim_dir(*t[:3]), t[3]) for t in mesh.tangents]
         tangents, bitangents = tangent_basis(authored, sk_nrm)
     else:
-        tangents, bitangents = compute_tangents(sk_pos, sk_nrm, uvs, mesh.triangles)
+        tangents, bitangents = compute_tangents(
+            sk_pos, sk_nrm, uvs, mesh.triangles, preserve_handedness=mesh.uv_handedness)
 
     n = len(sk_pos)
     center, radius = _bounding_sphere(sk_pos)
@@ -536,10 +537,14 @@ def build_nif(meshes: list[Mesh], texprefix: str, normal_map_flags: list[bool],
     `material_specs` is keyword-only and optional by design: the five positional
     parameters above are a frozen cross-process contract (darksouls-port calls this
     build as a subprocess). When it is None -- or every entry is None -- the output
-    is byte-for-byte what it has always been for legacy meshes (no authored tangents).
+    is byte-for-byte what it has always been for legacy meshes (no authored tangents
+    and uv_handedness=False).
     Entries align positionally with
     `meshes`; a None entry means "that shape keeps the static defaults".
     """
+    from .tangents import prepare_tangent_frames
+
+    meshes = [prepare_tangent_frames(mesh) for mesh in meshes]
     for m in meshes:
         if len(m.positions) > 0xFFFF:
             raise ValueError(f"shape '{m.name}' has {len(m.positions)} verts > 65535 "

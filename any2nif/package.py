@@ -120,6 +120,7 @@ def convert_package(args):
             raise AnyError(f"cannot read source: {source}")
         _check_destination(destination, source)
         name = _asset_name(args.asset_name or source.stem)
+        resolve_scale(args.unit, args.scale)  # Reject invalid scale before expensive baking.
         destination.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix=".any2nif-package-", dir=destination.parent) as temporary:
             staging = Path(temporary)
@@ -127,8 +128,7 @@ def convert_package(args):
             work.mkdir()
             normalized = normalize_to_gltf(str(source), str(work), fbx2gltf=args.fbx2gltf)
             prepared = prepare_materials(normalized, str(work / "prepared.gltf"),
-                                         bake_size=args.bake_size or 1024,
-                                         normal_y_sign=-1 if resolve_scale(args.unit, args.scale) < 0 else 1)
+                                         bake_size=args.bake_size or 1024)
             data_dir = staging / "data"
             nif = data_dir / "meshes" / "any2nif" / name / f"{name}.nif"
             texture_dir = data_dir / "textures" / "any2nif" / name

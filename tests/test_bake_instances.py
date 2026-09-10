@@ -35,7 +35,7 @@ def test_instances_keep_world_geometry_and_independent_materials(tmp_path):
                                    np.asarray(before.normals)[before.triangles])
 
 
-def test_negative_scale_compensates_baked_normal_y(tmp_path):
+def test_negative_scale_keeps_baked_normal_pixels_and_reflects_geometry(tmp_path):
     source = tmp_path / 'reflected.gltf'
     _write_two_uv_gltf(source)
     pixels = []
@@ -49,11 +49,9 @@ def test_negative_scale_compensates_baked_normal_y(tmp_path):
         normal_path = next(p for p in manifest['textures'] if p.endswith('_n.dds'))
         with Image.open(target / normal_path.replace('\\', '/')) as image:
             pixels.append(np.asarray(image.convert('RGB'), dtype=float))
-    # Quantized BC3 normal colors tolerate one RGB565 quantization step.
-    center = np.mean(np.asarray(meshes[0].uvs)[list(meshes[0].triangles[0])], axis=0)
-    x, y = np.clip((center * 64).astype(int), 0, 63)
-    a, b = pixels[0][y, x], pixels[1][y, x]
-    np.testing.assert_allclose(b, [a[0], 255-a[1], a[2]], atol=10)
+    # The generated NIF bitangent now carries reflection handedness itself.
+    # Flipping image Y as well would compensate twice and reverse the light.
+    np.testing.assert_array_equal(pixels[1], pixels[0])
     np.testing.assert_allclose(meshes[1].positions, -np.asarray(meshes[0].positions))
     assert meshes[1].triangles == [(a,c,b) for a,b,c in meshes[0].triangles]
 

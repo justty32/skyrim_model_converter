@@ -59,6 +59,10 @@ class Mesh:
     # Authored glTF tangent XYZ and handedness W; empty retains legacy UV basis.
     tangents: list[tuple[float, float, float, float]] = field(default_factory=list)
 
+    # Use the UV derivative handedness when generating a missing tangent frame.
+    # Default False retains the standalone gltf2nif byte contract.
+    uv_handedness: bool = False
+
     @property
     def has_normals(self) -> bool:
         return bool(self.positions) and len(self.normals) == len(self.positions)
@@ -88,11 +92,12 @@ def face_normals(positions, triangles) -> list[tuple[float, float, float]]:
     return out
 
 
-def compute_tangents(positions, normals, uvs, triangles):
+def compute_tangents(positions, normals, uvs, triangles, *, preserve_handedness=False):
     """Per-vertex tangent frame (Lengyel). Returns (tangents, bitangents), each a
     list of unit float3 in the same space as the inputs. BSTriShape needs a tangent
     basis for normal-mapped BSLightingShaderProperty; without UVs we fall back to an
-    arbitrary basis orthogonal to the normal."""
+    arbitrary basis orthogonal to the normal. Optional UV handedness matches the
+    accumulated dP/dV direction; False retains legacy cross(N,T) bitangents."""
     pos = np.asarray(positions, dtype=np.float64)
     nrm = np.asarray(normals, dtype=np.float64)
     n = len(pos)
@@ -109,8 +114,12 @@ def compute_tangents(positions, normals, uvs, triangles):
             denom = du1[0] * du2[1] - du2[0] * du1[1]
             f = 1.0 / denom if abs(denom) > 1e-12 else 0.0
             t = f * (du2[1] * e1 - du1[1] * e2)
+            if preserve_handedness:
+                bitangent_direction = f * (du1[0] * e2 - du2[0] * e1)
             for i in (a, b, c):
                 tan[i] += t
+                if preserve_handedness:
+                    bit[i] += bitangent_direction
     tangents, bitangents = [], []
     for i in range(n):
         ni = nrm[i]
@@ -124,6 +133,8 @@ def compute_tangents(positions, normals, uvs, triangles):
             ln = float(np.linalg.norm(t)) or 1.0
         t = t / ln
         b = np.cross(ni, t)
+        if preserve_handedness and float(np.dot(b, bit[i])) < 0:
+            b = -b
         tangents.append(tuple(t))
         bitangents.append(tuple(b))
     return tangents, bitangents

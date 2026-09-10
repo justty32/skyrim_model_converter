@@ -188,7 +188,7 @@ def _material_basename(gltf: GLTF2, prim) -> str:
 
 
 def read_gltf(path: str, *, preserve_tangents: bool = False) -> list[Mesh]:
-    """Parse static glTF; optional authored tangents leave the legacy default intact."""
+    """Parse static glTF; opt-in preserves authored and generated UV handedness."""
     try:
         gltf = GLTF2().load(path)
     except Exception as exc:  # noqa: BLE001
@@ -308,7 +308,7 @@ def read_gltf(path: str, *, preserve_tangents: bool = False) -> list[Mesh]:
             meshes.append(Mesh(
                 name=node_name or gmesh.name or f"mesh_{mi}_{pi}",
                 positions=positions, normals=normals, uvs=uvs, colors=colors, tangents=tangents,
-                triangles=tris,
+                triangles=tris, uv_handedness=preserve_tangents,
                 material=_material_basename(gltf, prim),
                 material_index=_material_index(gltf, prim),
             ))

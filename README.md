@@ -76,7 +76,7 @@ MVP 已改自寫純 Python 後端（見下「實作」節），不再依賴外�
 
 **格式來源**：niftools/nifxml `nif.xml`（逐欄查證，非憑記憶；reference 檔 gitignore）。
 **跑**：`python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt`，然後 `python -m nif2gltf --in foo.nif --out foo.gltf --flat`。
-**測**：`.venv/Scripts/python -m pytest`（**457 passed**，2026-09-10 以 `.venv-wsl/bin/python -m pytest -q` 實跑；包含真 FBX2glTF）。
+**測**：`.venv/Scripts/python -m pytest`（**470 passed**，2026-09-10 以 `.venv-wsl/bin/python -m pytest -q` 實跑；包含真 FBX2glTF）。
 跨 repo live consumer 測試在同層
 `../godot-worldspace-editor/tests/test_model_fetch_contract.py`：production CLI 的 synthetic
 NIF `.gltf + .bin` 會由 Godot 4.6 production `ModelFetch._load_gltf()` 真正載入，並驗
@@ -92,7 +92,7 @@ python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--coll
 ```
 
 - **幾何** `BSTriShape`（full-precision 佈局 stride 28，座標 glTF Y-up 公尺 → Skyrim Z-up ×70.03）
-- `gltf2nif/tangents.py` 驗證並保留來源切線方向與 handedness；`read_gltf(..., preserve_tangents=True)` 供 any2nif 啟用，裸 gltf2nif 預設仍重算。`tests/test_package_normal_frames.py` 讀實際 NIF T/B/N 與 DDS 驗光影方向，`tests/test_any2nif_tangents.py` 驗壞資料保護、legacy byte 契約及大型切分。
+- `gltf2nif/tangents.py` 驗證並保留來源切線方向與 handedness；`read_gltf(..., preserve_tangents=True)` 供 any2nif 啟用，同檔 `prepare_tangent_frames` 將生成切線的鏡射接縫拆開並固定正反手性，先生成再切分大型模型；裸 gltf2nif 預設仍使用舊算法。`tests/test_package_normal_frames.py` 讀實際 NIF T/B/N 與 DDS 驗光影方向，`tests/test_any2nif_tangents.py` 驗壞資料保護、legacy byte 契約及大型切分；`tests/test_generated_tangent_frames.py`／`test_generated_tangent_split.py` 驗無來源切線時的鏡射 UV、atlas 與切分；`tests/test_tangent_seams.py` 驗共用頂點的鏡射接縫與實際 normal DDS 方向。
 - **材質** `BSLightingShaderProperty`+`BSShaderTextureSet`（material 基名 → `<texprefix>\<基名>.dds` + 探測到的 `_n` normal map）
 - **碰撞** `--collision` hulls JSON → `bhkCollisionObject→bhkRigidBody→bhkListShape→bhkConvexVerticesShape`（Havok 公尺、不乘 70；STATIC/STONE/MOTION_FIXED）
 - 服務 [darksouls-port](../darksouls-port/plan.md) 的 `FLVER→glTF→NIF` 管線；m0046B1A18 實件已跑（5 shape / 1684 tri / 64 KB，round-trip 位置誤差 ~1.7e-6 m）。

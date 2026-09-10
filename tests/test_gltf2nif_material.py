@@ -96,10 +96,11 @@ def test_build_nif_positional_signature_is_frozen():
 
 def test_mesh_additive_fields_are_appended_with_defaults():
     fields = list(Mesh.__dataclass_fields__)
-    assert fields[-3:] == ["material_index", "colors", "tangents"]
+    assert fields[-4:] == ["material_index", "colors", "tangents", "uv_handedness"]
     assert Mesh().material_index == -1
     assert Mesh().colors == []
     assert Mesh().tangents == []
+    assert Mesh().uv_handedness is False
 
 
 def test_omitting_specs_equals_none_equals_all_none_single_shape():

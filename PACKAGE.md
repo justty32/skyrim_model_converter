@@ -44,7 +44,7 @@ diffuse 輸出 BC1／BC3；normal 會先將 `normalTexture.scale` 烘進法線�
 
 傳統 Skyrim 材質不是完整 PBR。Metallic／roughness 以既有公式近似，roughness 影像反相為 specular mask；`KHR_materials_specular` 有提供時優先採用。True PBR、材質的完全等價轉換與凹形碰撞自動拆分仍未實作。骨架、動畫、morph 與 sparse accessor 沿用靜態後端的拒絕規則。
 
-來源同時提供 `NORMAL` 與 `TANGENT` 時，`any2nif` 會保留切線方向及正反手性，連同 node transform、`--up-axis`、負縮放與大模型切分一起傳到 NIF。共用 UV 的直通路徑不因此重排 UV 或放大貼圖，避免丟失來源的凹凸方向。缺少 `NORMAL` 時忽略來源 `TANGENT`；生成法線仍沿用既有平滑近似。來源切線必須是與頂點數相符的 FLOAT VEC4、方向有限且非零、W 為 ±1，不能與 normal 平行；壞資料回 exit 2 並保留舊包。bitangent 的關係依 [glTF mesh 規格](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#meshes-overview)。重烘路徑仍按來源切線換算法線圖，再交給 NIF 的 atlas 切線方向。
+來源同時提供 `NORMAL` 與 `TANGENT` 時，`any2nif` 會保留切線方向及正反手性，連同 node transform、`--up-axis`、負縮放與大模型切分一起傳到 NIF。共用 UV 的直通路徑不因此重排 UV 或放大貼圖，避免丟失來源的凹凸方向。缺少 `NORMAL` 時忽略來源 `TANGENT`；生成法線仍沿用既有平滑近似。來源切線必須是與頂點數相符的 FLOAT VEC4、方向有限且非零、W 為 ±1，不能與 normal 平行；壞資料回 exit 2 並保留舊包。bitangent 的關係依 [glTF mesh 規格](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#meshes-overview)。缺來源 TANGENT 時也會依 UV 的正反方向生成切線，鏡射 UV 的直通貼圖保持原尺寸。鏡射接縫會複製頂點，讓同一個三角形的正反手性一致；重烘與最終 NIF 使用相同的逐角點切線，先生成再切分大型模型，保留跨分件的平滑方向。完全退化的 UV 仍使用固定備援方向。
 
 法線強度支援 0（消除傾斜）、介於 0 與 1（減弱）、大於 1（加強）及負值（反轉 X／Y）；NaN／Infinity 會報錯。計算依 [glTF normalTexture.scale 定義](https://raw.githubusercontent.com/KhronosGroup/glTF/main/specification/2.0/schema/material.normalTextureInfo.schema.json)，在壓縮前烘焙，因此仍有 DDS 壓縮與濾波誤差。
 
@@ -66,7 +66,7 @@ python -m any2nif SheenChair.glb output/SheenChair --package --collision convex-
 
 採樣支援 REPEAT、MIRRORED_REPEAT、CLAMP_TO_EDGE，以及 nearest／bilinear；共用 UV 的非預設 sampler 也會自動重烘，無效 sampler 索引／wrap／filter 會拒絕。RGB 色圖在線性空間取樣，normal、roughness、AO 等資料圖不做 sRGB 轉換。烘焙以來源最高解析度取樣，未模擬視角相關的來源 mip／anisotropic 濾波。Atlas 預留外圈供小區塊補救，未覆蓋區域補最近的邊緣顏色，再交給既有 DDS 完整 mipmap 流程。4096 的四槽合成模型完整試轉約 89 秒、峰值記憶體約 1.52 GiB（本次 WSL 實測，非所有模型的上限）。
 
-AO 使用紅色通道與 `strength`，乘進線性 diffuse，之後再套 diffuse RGB factor；alpha 不乘 AO。這是傳統 Skyrim 的陰影近似，會讓直接光照也變暗，並非 glTF 的環境光遮蔽等價實作。normal 會先套強度，再按原 UV 與新 UV 的切線方向換算；有來源 tangent 時保留其方向與 handedness，再依 UV 變換換算；沒有時使用平滑切線近似，並非 MikkTSpace。normal 變換需要可逆的 UV 縮放。超過 NIF 頂點上限的模型依實際切分後的切線方向烘焙。負 `--scale` 另補償法線 Y 方向。Sheen 與材質 variants 仍不轉成 Skyrim 對等效果，使用來源預設材質。
+AO 使用紅色通道與 `strength`，乘進線性 diffuse，之後再套 diffuse RGB factor；alpha 不乘 AO。這是傳統 Skyrim 的陰影近似，會讓直接光照也變暗，並非 glTF 的環境光遮蔽等價實作。normal 會先套強度，再按原 UV 與新 UV 的切線方向換算；有來源 tangent 時保留其方向與 handedness，再依 UV 變換換算；沒有來源 tangent 時，從 UV 的兩個方向求切線與正反手性，包含鏡射 UV；生成方式仍是平滑近似，並非 MikkTSpace。normal 變換需要可逆的 UV 縮放。超過 NIF 頂點上限時保留切分前已生成的切線方向。負 `--scale` 的鏡射由 NIF 切線正反手性處理。Sheen 與材質 variants 仍不轉成 Skyrim 對等效果，使用來源預設材質。
 
 公開真實模型的固定版本、試轉結果與可重跑指令見 [REAL-ASSETS.md](REAL-ASSETS.md)。
 

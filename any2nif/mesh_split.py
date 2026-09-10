@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 from gltf2nif.geometry import Mesh
+from gltf2nif.tangents import prepare_tangent_frames
 
 from .errors import AnyError
 
@@ -67,21 +68,25 @@ def _part(mesh, triangles, number):
         material_index=mesh.material_index,
         colors=select(mesh.colors),
         tangents=select(mesh.tangents),
+        uv_handedness=mesh.uv_handedness,
     )
 
 
 def split_meshes(meshes, max_vertices=65535):
     """Return meshes whose triangle-referenced vertex sets fit ``max_vertices``.
 
-    Meshes already within the limit are returned by identity. Oversized meshes are
-    greedily batched in source triangle order; indices shared inside a batch remain
-    shared. No triangle is dropped or reordered.
+    Meshes already within the limit are returned by identity unless generated
+    tangent handedness requires seam preparation. Oversized meshes are greedily
+    batched in source triangle order; indices shared inside a batch remain shared.
+    No triangle is dropped or reordered.
     """
     if isinstance(max_vertices, bool) or not isinstance(max_vertices, int) or max_vertices < 3:
         raise AnyError("mesh split: max_vertices must be an integer of at least 3")
 
     result = []
     for mesh in meshes:
+        _validate(mesh)
+        mesh = prepare_tangent_frames(mesh)
         _validate(mesh)
         if len(mesh.positions) <= max_vertices:
             result.append(mesh)
