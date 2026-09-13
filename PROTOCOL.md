@@ -99,7 +99,7 @@ python ..\godot-worldspace-editor\tests\test_model_fetch_contract.py
 nif→glTF 的鏡像方向，供 [darksouls-port](../darksouls-port/plan.md) 的資產移植管線消費。**dumb 工具**：一個 glTF → 一個 `.nif`，不認呼叫方、不讀 ESM。參考後端＝本 repo 的 `gltf2nif` Python 模組（欄位表與選值見 [gltf2nif/README.md](gltf2nif/README.md)）。
 
 ```
-gltf2nif <in.gltf> <out.nif> [--texprefix <textures\prefix>] [--collision <hulls.json>] [--root-name <name>]
+gltf2nif <in.gltf> <out.nif> [--texprefix <textures\prefix>] [--collision <hulls.json>] [--materials <materials.json>] [--root-name <name>]
 ```
 
 | 旗標 | 必填 | 語意 |
@@ -108,6 +108,7 @@ gltf2nif <in.gltf> <out.nif> [--texprefix <textures\prefix>] [--collision <hulls
 | `out.nif` | ✅ | 目標 SSE `.nif`（20.2.0.7 / user 12 / BSVersion 100） |
 | `--texprefix` | | 貼圖路徑前綴（預設 `textures\dsport`）；material 基名 → slot0 `<prefix>\<基名>.dds`、slot1 `<基名>_n.dds`（探測到才填） |
 | `--collision` | | hulls JSON（公尺 / DS Y-up）→ `bhkConvexVerticesShape` 串（不乘 70；STATIC/STONE/MOTION_FIXED） |
+| `--materials` | | version 1 named-mesh JSON；精確覆寫貼圖／alpha／雙面／effect，`group` 合併同材質 primitive，`skip` 移除 primitive；輸入 mesh 必須一對一全覆蓋 |
 | `--root-name` | | 根 `NiNode` 名 |
 
 **座標約定**：glTF Y-up 公尺 → Skyrim Z-up units，`(x,y,z)→(x,−z,y)×70.03`（幾何）；碰撞 hull 只軸變換不乘尺度（bhk 內部＝Havok 公尺）。

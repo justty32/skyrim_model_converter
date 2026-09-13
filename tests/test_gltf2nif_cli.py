@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import struct
 
 from gltf2nif.cli import main
 from nif2gltf.nif_reader import read_nif
@@ -57,3 +58,61 @@ def test_bad_collision_exit1(tmp_path):
     bad = tmp_path / "h.json"
     bad.write_text(json.dumps({"hulls": [{"vertices": [[0, 0, 0], [1, 0, 0]]}]}))  # <4 verts
     assert main([src, str(tmp_path / "o.nif"), "--collision", str(bad)]) == 1
+
+
+def test_material_overrides_merge_skip_and_write_exact_slots(tmp_path):
+    src = str(tmp_path / "in.gltf")
+    out = str(tmp_path / "out.nif")
+    write_gltf_interleaved(src, _PRIM * 3)
+    overrides = tmp_path / "materials.json"
+    overrides.write_text(json.dumps({
+        "version": 1,
+        "materials": [
+            {
+                "mesh": "mesh0", "group": "foliage", "double_sided": True,
+                "diffuse_texture_name": r"textures\x\leaf.dds",
+                "normal_texture_name": r"textures\x\leaf_n.dds",
+                "alpha_mode": "MASK", "alpha_flags_override": 4844,
+                "alpha_threshold_override": 128,
+            },
+            {
+                "mesh": "mesh1", "group": "foliage", "double_sided": True,
+                "diffuse_texture_name": r"textures\x\leaf.dds",
+                "normal_texture_name": r"textures\x\leaf_n.dds",
+                "alpha_mode": "MASK", "alpha_flags_override": 4844,
+                "alpha_threshold_override": 128,
+            },
+            {"mesh": "mesh2", "group": "water", "skip": True},
+        ],
+    }))
+    assert main([src, out, "--materials", str(overrides)]) == 0
+
+    data = open(out, "rb").read()
+    meshes = read_nif(data)
+    assert len(meshes) == 1
+    assert len(meshes[0].triangles) == 2
+    assert meshes[0].texture == r"textures\x\leaf.dds"
+    from nif2gltf._binreader import _Reader
+    from nif2gltf._blocks import _read_bsshadertextureset
+    from nif2gltf.nif_reader import _read_header
+    header = _read_header(_Reader(data))
+    assert header["types"].count("NiAlphaProperty") == 1
+    lsp = header["types"].index("BSLightingShaderProperty")
+    flags2 = struct.unpack_from("<I", data, header["offsets"][lsp] + 20)[0]
+    assert flags2 & 0x10
+    texset = header["types"].index("BSShaderTextureSet")
+    reader = _Reader(data)
+    reader.seek(header["offsets"][texset])
+    assert _read_bsshadertextureset(reader)["textures"][:2] == [
+        r"textures\x\leaf.dds", r"textures\x\leaf_n.dds"]
+
+
+def test_material_overrides_fail_closed_on_mesh_mismatch(tmp_path):
+    src = str(tmp_path / "in.gltf")
+    write_gltf_interleaved(src, _PRIM)
+    overrides = tmp_path / "materials.json"
+    overrides.write_text(json.dumps({
+        "version": 1, "materials": [{"mesh": "wrong-name"}],
+    }))
+    assert main([src, str(tmp_path / "out.nif"),
+                 "--materials", str(overrides)]) == 1

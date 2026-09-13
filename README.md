@@ -93,7 +93,7 @@ python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--coll
 
 - **幾何** `BSTriShape`（full-precision 佈局 stride 28，座標 glTF Y-up 公尺 → Skyrim Z-up ×70.03）
 - `gltf2nif/tangents.py` 驗證並保留來源切線方向與 handedness；`read_gltf(..., preserve_tangents=True)` 供 any2nif 啟用，同檔 `prepare_tangent_frames` 將生成切線的鏡射接縫拆開並固定正反手性，先生成再切分大型模型；裸 gltf2nif 預設仍使用舊算法。`tests/test_package_normal_frames.py` 讀實際 NIF T/B/N 與 DDS 驗光影方向，`tests/test_any2nif_tangents.py` 驗壞資料保護、legacy byte 契約及大型切分；`tests/test_generated_tangent_frames.py`／`test_generated_tangent_split.py` 驗無來源切線時的鏡射 UV、atlas 與切分；`tests/test_tangent_seams.py` 驗共用頂點的鏡射接縫與實際 normal DDS 方向。
-- **材質** `BSLightingShaderProperty`+`BSShaderTextureSet`（material 基名 → `<texprefix>\<基名>.dds` + 探測到的 `_n` normal map）
+- **材質** `BSLightingShaderProperty`+`BSShaderTextureSet`（material 基名 → `<texprefix>\<基名>.dds` + 探測到的 `_n` normal map）；`--materials` 可用 named-mesh JSON 精確覆寫貼圖／alpha／雙面／effect，並合併或跳過 primitive
 - **碰撞** `--collision` hulls JSON → `bhkCollisionObject→bhkRigidBody→bhkListShape→bhkConvexVerticesShape`（Havok 公尺、不乘 70；STATIC/STONE/MOTION_FIXED）
 - 服務 [darksouls-port](../darksouls-port/plan.md) 的 `FLVER→glTF→NIF` 管線；m0046B1A18 實件已跑（5 shape / 1684 tri / 64 KB，round-trip 位置誤差 ~1.7e-6 m）。
 

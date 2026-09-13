@@ -189,7 +189,7 @@ def _read_bstrishape(r: _Reader, bs_version: int) -> dict:
             r.f32()
     skin_ref = r.i32()
     shader_ref = r.i32()          # Shader Property (-> BSLightingShaderProperty)
-    r.i32()                       # Alpha Property
+    alpha_ref = r.i32()           # Alpha Property
     vertex_desc = r.u64()
     if bs_version >= 130:         # FO4+: uint triangle count
         num_triangles = r.u32()
@@ -241,6 +241,7 @@ def _read_bstrishape(r: _Reader, bs_version: int) -> dict:
         "local": _local_matrix(trans, rot, scale),
         "skinned": skinned,
         "shader_ref": shader_ref,
+        "alpha_ref": alpha_ref,
         "verts": verts,
         "normals": normals if len(normals) == len(verts) else [],
         "uvs": uvs if len(uvs) == len(verts) else [],
@@ -262,4 +263,4 @@ def _read_bslightingshaderproperty(r: _Reader, block_start: int) -> dict:
 def _read_bsshadertextureset(r: _Reader) -> dict:
     n = r.u32()
     paths = [r.sized_string() for _ in range(n)]
-    return {"kind": "texset", "diffuse": paths[0] if paths else ""}
+    return {"kind": "texset", "diffuse": paths[0] if paths else "", "textures": paths}

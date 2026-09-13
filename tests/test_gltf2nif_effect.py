@@ -83,6 +83,14 @@ def test_blended_effect_enables_vertex_alpha_shader_flag():
     assert struct.unpack_from("<I", data, offset + 16)[0] & 0x8
 
 
+def test_double_sided_effect_enables_shader_flag():
+    spec = MaterialSpec(shader_kind="effect", double_sided=True)
+    data = build_nif([_mesh()], r"textures\dsport", [False], material_specs=[spec])
+    header = _header(data)
+    offset = header["offsets"][header["types"].index("BSEffectShaderProperty")]
+    assert struct.unpack_from("<I", data, offset + 20)[0] & 0x10
+
+
 def test_colored_effect_uses_nif_schema_vertex_color_bits():
     mesh = _mesh()
     mesh.colors = [(1, 0, 0, 1), (0, 1, 0, .5), (0, 0, 1, 0)]

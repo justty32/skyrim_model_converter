@@ -333,6 +333,8 @@ def _build_esp(name_idx: int, source_texture: str, spec: MaterialSpec,
         flags1 |= _SLSF1_VERTEX_ALPHA
     if has_vertex_colors:
         flags2 |= _SLSF2_VERTEX_COLORS
+    if spec.double_sided:
+        flags2 |= _SLSF2_DOUBLE_SIDED
 
     w = _Writer()
     # Inherited BSShaderProperty/NiObjectNET prefix, same BSVersion-100 layout as LSP.
@@ -515,6 +517,8 @@ def _slot_paths(mesh: Mesh, texprefix: str, has_normal: bool,
     normal = f"{prefix}{base}_n.dds" if has_normal else ""
     if spec is None:
         return [diffuse, normal]
+    if spec.diffuse_texture_name:
+        diffuse = spec.diffuse_texture_name
     if spec.normal_texture_name:
         normal = spec.normal_texture_name
     slots = [diffuse, normal] + [""] * 6  # slots 0..7 (slot8 is padded by _build_texset)

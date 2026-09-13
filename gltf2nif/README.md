@@ -9,7 +9,7 @@ model-converter 的**反向後端**：把 glTF 2.0 靜態 mesh 寫成 Skyrim Spe
 ## 用法
 
 ```
-python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--collision hulls.json] [--root-name "Scene Root"]
+python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--collision hulls.json] [--materials materials.json] [--root-name "Scene Root"]
 ```
 
 | 旗標 | 必填 | 語意 |
@@ -18,6 +18,7 @@ python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--coll
 | `out.nif` | ✅ | 目標 `.nif` |
 | `--texprefix` | | 貼圖路徑前綴（預設 `textures\dsport`）。material 基名接在後面組成 slot 路徑 |
 | `--collision` | | hulls JSON → `bhkConvexVerticesShape` 碰撞（見下） |
+| `--materials` | | version 1 的 named-mesh JSON；逐 mesh 覆寫 diffuse／normal、alpha、雙面／effect，並可依 `group` 合併或以 `skip` 移除 primitive |
 | `--root-name` | | 根 `NiNode` 名（預設 `Scene Root`） |
 
 Exit code：`0` 成功／`1` 一般錯誤／`2` glTF 解析失敗。
@@ -63,6 +64,13 @@ glTF (x, y, z)  →  Skyrim (x, −z, y)            # normal / 平面（方向�
 - slot0 diffuse = `<texprefix>\<基名>.dds`
 - slot1 normal = `<texprefix>\<基名>_n.dds`——**僅當 glTF 同目錄存在對應 `_n.dds` 才填**（否則留空）。
 - 其餘 slot 留空。DSR 的 `_s` spec map **已知限制：先忽略**（Skyrim specular 走 model-space 慣例不同，之後再處理）。
+
+`--materials` 的最小格式如下。陣列必須恰好覆蓋每個來源 mesh，`mesh` 名不可重複；同一
+`group` 的 primitive 會合成一個 shape，`skip: true` 則完全不寫出。路徑覆寫是完整 NIF 路徑。
+
+```json
+{"version": 1, "materials": [{"mesh": "wall_mesh0", "group": "stone", "diffuse_texture_name": "textures\\port\\stone.dds", "normal_texture_name": "textures\\port\\stone_n.dds", "double_sided": false, "alpha_mode": "MASK", "alpha_flags_override": 4844, "alpha_threshold_override": 128}]}
+```
 
 `BSLightingShaderProperty`（Default type，100 bytes）欄位選值表（值取自真實市售 SSE 不透明+normal map 靜態 mesh；拿不準者選最保守常見值）：
 

@@ -13,6 +13,7 @@ import sys
 from ._binwriter import GltfError
 from .collision import load_hulls
 from .gltf_reader import probe_normal_map, read_gltf
+from .material import apply_material_overrides, load_material_overrides
 from .nif_writer import build_nif
 
 DEFAULT_TEXPREFIX = "textures\\dsport"
@@ -29,6 +30,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--texprefix", default=DEFAULT_TEXPREFIX,
                         help=r"texture path prefix for .dds slots (default: textures\dsport)")
     parser.add_argument("--collision", help="hulls JSON -> bhkConvexVerticesShape collision")
+    parser.add_argument(
+        "--materials",
+        help="version-1 named-mesh JSON: texture/alpha/double-sided overrides, merge, skip",
+    )
     parser.add_argument("--root-name", default="Scene Root", help="root NiNode name")
     args = parser.parse_args(argv)
 
@@ -46,6 +51,15 @@ def main(argv: list[str] | None = None) -> int:
 
     gltf_dir = os.path.dirname(os.path.abspath(args.in_path))
     normal_flags = [probe_normal_map(gltf_dir, m.material) for m in meshes]
+    material_specs = None
+    if args.materials:
+        try:
+            overrides = load_material_overrides(args.materials, meshes)
+            meshes, material_specs = apply_material_overrides(meshes, overrides)
+            normal_flags = [bool(spec.normal_texture_name) for spec in material_specs]
+        except (GltfError, OSError, ValueError) as exc:
+            print(f"error: materials {args.materials}: {exc}", file=sys.stderr)
+            return 1
 
     hulls = None
     if args.collision:
@@ -56,7 +70,10 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     try:
-        data = build_nif(meshes, args.texprefix, normal_flags, hulls, args.root_name)
+        data = build_nif(
+            meshes, args.texprefix, normal_flags, hulls, args.root_name,
+            material_specs=material_specs,
+        )
     except Exception as exc:  # noqa: BLE001
         print(f"error: writing NIF: {exc}", file=sys.stderr)
         return 1

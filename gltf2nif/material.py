@@ -26,8 +26,12 @@ and enables the SLSF2_Vertex_Colors flag defined by nif.xml.
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
+
+from ._binwriter import GltfError
+from .geometry import Mesh
 
 # glTF spec defaults, used whenever a material omits the field.
 _DEFAULT_BASE_COLOR = (1.0, 1.0, 1.0, 1.0)
@@ -58,11 +62,166 @@ class MaterialSpec:
     specular_factor: float = 1.0
     # Exact NIF texture path for slot 1. Empty preserves normal-map probing/fallback.
     normal_texture_name: str = ""
+    # Exact NIF texture path for slot 0. Empty preserves material-name construction.
+    diffuse_texture_name: str = ""
     # Optional raw NiAlphaProperty overrides for callers with engine-tested values.
     alpha_flags_override: int | None = None
     alpha_threshold_override: int | None = None
     # "effect" selects BSEffectShaderProperty; every other value uses lighting.
     shader_kind: str = "lighting"
+
+
+@dataclass
+class MaterialOverride:
+    """One CLI material record, aligned to a named source mesh."""
+
+    mesh: str
+    group: str
+    skip: bool
+    spec: MaterialSpec
+
+
+def _require_str(record: dict, key: str, default: str = "") -> str:
+    value = record.get(key, default)
+    if not isinstance(value, str):
+        raise GltfError(f"material override '{key}' must be a string")
+    return value
+
+
+def _optional_int(record: dict, key: str) -> int | None:
+    value = record.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise GltfError(f"material override '{key}' must be an integer or null")
+    return value
+
+
+def load_material_overrides(path: str, meshes: list[Mesh]) -> list[MaterialOverride]:
+    """Load the version-1 named-mesh JSON contract used by ``--materials``.
+
+    Every source mesh must have exactly one record. ``group`` lets callers merge
+    primitives that came from the same authored material; ``skip`` removes all
+    geometry in that record before NIF emission.
+    """
+    try:
+        with open(path, encoding="utf-8") as stream:
+            payload = json.load(stream)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise GltfError(f"cannot read material overrides: {path}: {exc}") from exc
+    if not isinstance(payload, dict) or payload.get("version") != 1:
+        raise GltfError("material overrides must be an object with version 1")
+    records = payload.get("materials")
+    if not isinstance(records, list):
+        raise GltfError("material overrides must contain a 'materials' array")
+
+    by_mesh: dict[str, MaterialOverride] = {}
+    for number, record in enumerate(records):
+        if not isinstance(record, dict):
+            raise GltfError(f"material override {number} must be an object")
+        mesh_name = _require_str(record, "mesh")
+        if not mesh_name:
+            raise GltfError(f"material override {number} has an empty mesh name")
+        if mesh_name in by_mesh:
+            raise GltfError(f"duplicate material override for mesh '{mesh_name}'")
+        alpha_mode = _require_str(record, "alpha_mode", "OPAQUE").upper()
+        if alpha_mode not in ("OPAQUE", "MASK", "BLEND"):
+            raise GltfError(f"material override '{mesh_name}' has invalid alpha_mode")
+        shader_kind = _require_str(record, "shader_kind", "lighting")
+        if shader_kind not in ("lighting", "effect"):
+            raise GltfError(f"material override '{mesh_name}' has invalid shader_kind")
+        skip = record.get("skip", False)
+        double_sided = record.get("double_sided", False)
+        if not isinstance(skip, bool) or not isinstance(double_sided, bool):
+            raise GltfError(
+                f"material override '{mesh_name}' skip/double_sided must be booleans")
+        spec = MaterialSpec(
+            base_name=_require_str(record, "base_name"),
+            alpha_mode=alpha_mode,
+            alpha_cutoff=float(record.get("alpha_cutoff", 0.5)),
+            double_sided=double_sided,
+            normal_texture_name=_require_str(record, "normal_texture_name"),
+            diffuse_texture_name=_require_str(record, "diffuse_texture_name"),
+            alpha_flags_override=_optional_int(record, "alpha_flags_override"),
+            alpha_threshold_override=_optional_int(record, "alpha_threshold_override"),
+            shader_kind=shader_kind,
+        )
+        group = _require_str(record, "group", mesh_name)
+        if not group:
+            raise GltfError(f"material override '{mesh_name}' has an empty group")
+        by_mesh[mesh_name] = MaterialOverride(
+            mesh=mesh_name,
+            group=group,
+            skip=skip,
+            spec=spec,
+        )
+
+    source_names = [mesh.name for mesh in meshes]
+    if len(set(source_names)) != len(source_names):
+        raise GltfError("--materials requires unique source mesh names")
+    missing = [name for name in source_names if name not in by_mesh]
+    extra = sorted(set(by_mesh) - set(source_names))
+    if missing or extra:
+        raise GltfError(
+            f"material override mesh mismatch: missing={missing[:5]}, extra={extra[:5]}")
+    return [by_mesh[name] for name in source_names]
+
+
+def _merge_group(group: str, meshes: list[Mesh]) -> Mesh:
+    """Join same-material primitives while retaining every triangle and attribute."""
+    first = meshes[0]
+    for label in ("normals", "uvs", "colors", "tangents"):
+        present = [bool(getattr(mesh, label)) for mesh in meshes]
+        if any(present) and not all(present):
+            raise GltfError(f"material group '{group}' mixes meshes with/without {label}")
+    positions = []
+    triangles = []
+    offset = 0
+    for mesh in meshes:
+        positions.extend(mesh.positions)
+        triangles.extend((a + offset, b + offset, c + offset)
+                         for a, b, c in mesh.triangles)
+        offset += len(mesh.positions)
+    if len(positions) > 0xFFFF or len(triangles) > 0xFFFF:
+        raise GltfError(
+            f"material group '{group}' exceeds the NIF 65535 vertex/triangle limit")
+    join = lambda label: [value for mesh in meshes for value in getattr(mesh, label)]
+    return Mesh(
+        name=first.name,
+        positions=positions,
+        normals=join("normals"),
+        uvs=join("uvs"),
+        triangles=triangles,
+        material=first.material,
+        material_index=first.material_index,
+        colors=join("colors"),
+        tangents=join("tangents"),
+        uv_handedness=any(mesh.uv_handedness for mesh in meshes),
+    )
+
+
+def apply_material_overrides(
+        meshes: list[Mesh], overrides: list[MaterialOverride]
+        ) -> tuple[list[Mesh], list[MaterialSpec]]:
+    """Drop skipped records and merge each authored-material group."""
+    if len(meshes) != len(overrides):
+        raise GltfError("material override count differs from source mesh count")
+    groups: dict[str, tuple[list[Mesh], MaterialSpec]] = {}
+    for mesh, override in zip(meshes, overrides):
+        if override.skip:
+            continue
+        if override.group in groups:
+            if groups[override.group][1] != override.spec:
+                raise GltfError(
+                    f"material group '{override.group}' contains different specifications")
+            groups[override.group][0].append(mesh)
+        else:
+            groups[override.group] = ([mesh], override.spec)
+    if not groups:
+        raise GltfError("material overrides removed every source mesh")
+    merged = [_merge_group(group, items) for group, (items, _) in groups.items()]
+    specs = [spec for _, spec in groups.values()]
+    return merged, specs
 
 
 def _clamp(value: float, lo: float, hi: float) -> float:
