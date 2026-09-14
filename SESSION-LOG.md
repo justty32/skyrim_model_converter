@@ -50,7 +50,7 @@ SheenChair 六個來源材質均為 OPAQUE，透明裁切修正不影響最新 `
 
 驗證：`.venv-wsl/bin/python -m pytest -q --disable-warnings` → **499 passed、零 skipped**；包含真 FBX2glTF、跨格式完整 Data 目錄、所有 DDS 槽位、65535 頂點切分、負縮放、錯誤資料與發布／回復。仍有既有套件的 deprecation warnings。
 
-跨 repo darksouls-port live contract 先前嘗試：`.venv-wsl/bin/python -m unittest discover -s ../darksouls-port/tests -p test_model_converter_contract.py -v`，其 `initial_state.py` import 仍缺少 soulstruct，測試未能啟動。前輪 writer 新增可選 authored tangents，但裸 reader 預設不啟用；既有單／雙 shape 的 NIF SHA-256 基準與新 opt-in 隔離測試通過。未改 darksouls-port，不能把本 repo 測試當成跨 repo live contract 已通過。
+跨 repo darksouls-port live contract 的 soulstruct 阻塞已於 2026-09-14 解除（DSPort `547a4b7`）：`p1_batch.py` 只在完整 P1 batch 的 DS initial-state analysis 階段延後載入 parser，helper contract 不再 eager import。公司 `.venv-wsl` 真實執行 `p1_batch.convert_or_reuse()` → production `gltf2nif` → production reader，render/collision 與 stale-output failure cleanup **2/2 通過**；完整 batch 仍明確需要 soulstruct 與 DS 素材。前輪 writer 新增可選 authored tangents，但裸 reader 預設不啟用；既有單／雙 shape 的 NIF SHA-256 基準與新 opt-in 隔離測試通過。
 
 ## 後續方向
 
