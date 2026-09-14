@@ -2,6 +2,8 @@
 
 Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目錄；模型引用的 DDS 全數存在且可解碼；失敗保留既有成品；glTF/GLB、OBJ、FBX 等路徑有離線驗證，CLI／測試／文件對齊。遊戲內外觀與站立驗收另行記錄，不用離線測試冒充。
 
+2026-09-14 converter effect 材質 CTD 離線修正完成：`BSEffectShaderProperty` 誤用 lighting-only `Shader Type` 造成多 4-byte prefix，令引擎將 `0xFFFFFFFF` 讀成 `Num Extra Data List`。修正為 Name/count/Controller 的 12-byte prefix；新回歸獨立解碼 payload，舊實作實跑失敗 `(0, 4294967295, 0) != (-1, 0, -1)`。focused **7 passed**，完整 suite **503 passed、80 warnings**，格式證據與實機邊界見 [EFFECT-SHADER-CTD.md](EFFECT-SHADER-CTD.md)。兩個 DS 光柱需回家重產後進原 cell 驗收；本輪未改 consumer skip/materials。
+
 ## 現役狀態
 
 2026-09-10 MASK 透明裁切修正完成：依 NifTools AlphaFlags／TestFunction 將誤開混合、比較 ALWAYS 的 0x0201 改為關閉混合、GREATER_EQUAL 的 0x1A00；門檻採 ceil(cutoff × 255)，合法 cutoff > 1 使用 NEVER。真 glTF／PNG 經完整 CLI 後直接讀 NIF 與 DDS，驗 0／0.25／0.499／0.5／1／1.1 的比較邊界，另驗 alpha 倍率只存材質、不重複烘入；BLEND 與 raw overrides 既有測試通過。修正前 4 項新測試因錯誤 blend bit 失敗；最終新測試 7 passed，完整 suite **499 passed、80 warnings**。這是離線格式驗證，非遊戲裁切驗收。

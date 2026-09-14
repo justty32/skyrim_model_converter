@@ -1,9 +1,8 @@
 """Assemble a Skyrim SSE static NIF (20.2.0.7 / user 12 / BSVersion 100) from Mesh IR.
 
-Every byte layout here was verified against real vanilla SSE nifs (a shipped mesh
-with BSTriShape + BSLightingShaderProperty + bhkRigidBody) and against nif2gltf's
-reader — whatever nif2gltf reads back, this writes. See README.md for the field
-tables and where each constant came from.
+The static lighting and collision layouts were checked against real vanilla SSE
+NIFs.  Format-specific fields are also checked against pinned NifTools schema
+definitions and independent byte-decoding tests; see README.md for the evidence.
 
 Block plan:
     0                : NiNode (root; children = every shape; collision ref if hulls)
@@ -319,7 +318,7 @@ def _build_lsp(name_idx: int, texset_ref: int, spec: MaterialSpec | None = None,
     return bytes(w.buf)          # 100 bytes
 
 
-def _build_esp(name_idx: int, source_texture: str, spec: MaterialSpec,
+def _build_esp(source_texture: str, spec: MaterialSpec,
                *, has_vertex_colors: bool = False) -> bytes:
     """BSEffectShaderProperty for Skyrim SSE (NIF 20.2.0.7, BSVersion 100).
 
@@ -337,10 +336,11 @@ def _build_esp(name_idx: int, source_texture: str, spec: MaterialSpec,
         flags2 |= _SLSF2_DOUBLE_SIDED
 
     w = _Writer()
-    # Inherited BSShaderProperty/NiObjectNET prefix, same BSVersion-100 layout as LSP.
-    w.u32(name_idx)                 # NiObjectNET Name
-    w.u32(0xFFFFFFFF)               # inherited legacy Extra Data ref (-1)
-    w.u32(0x00000000)               # inherited legacy extra-data count/reserved
+    # NiObjectNET prefix.  BSLightingShaderProperty alone gets a leading Shader Type
+    # field at this version; applying its 16-byte prefix here makes 0xFFFFFFFF become
+    # Num Extra Data List, which drives Skyrim into an oversized allocation/copy.
+    w.i32(-1)                       # NiObjectNET Name (no name)
+    w.u32(0)                        # Num Extra Data List
     w.i32(-1)                       # Time Controller ref
     w.u32(flags1)                   # nif.xml: Shader Flags 1 SK
     w.u32(flags2)                   # nif.xml: Shader Flags 2 SK
@@ -608,7 +608,7 @@ def build_nif(meshes: list[Mesh], texprefix: str, normal_map_flags: list[bool],
             paths = _slot_paths(m, texprefix, has_n, spec)
             source_texture = paths[0] if paths else ""
             blocks.append(("BSEffectShaderProperty", _build_esp(
-                0, source_texture, spec, has_vertex_colors=m.has_colors)))
+                source_texture, spec, has_vertex_colors=m.has_colors)))
         else:
             texset_idx = shape_idx + 2
             blocks.append(("BSLightingShaderProperty", _build_lsp(
