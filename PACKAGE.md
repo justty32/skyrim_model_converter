@@ -6,7 +6,7 @@
 python -m any2nif chair.glb output/Chair --package
 ```
 
-輸出目錄裡會有 `meshes/any2nif/chair/chair.nif`、`textures/any2nif/chair/` 內的 DDS，以及 `converter-package.json`。這是 Data 內容，不含 ESP：可交給已有的 ModForge 資產打包流程，或由既有 plugin 的 Model 欄位引用。這裡尚未新增 ModForge 的 `importmesh` 指令。
+輸出目錄裡會有 `meshes/any2nif/chair/chair.nif`、`textures/any2nif/chair/` 內的 DDS，以及 `converter-package.json`。預設是 Data 內容，不含 ESP：可交給已有的 ModForge 資產打包流程，或由既有 plugin 的 Model 欄位引用。要直接進遊戲看，加 `--plugin --test-cell`（見下「直接產 plugin」）。
 
 來源 glTF／GLB 直接解析；OBJ、STL、PLY、DAE 等沿用 trimesh，FBX 使用專案內的 FBX2glTF。trimesh 場景匯入會保留各零件的累積位移／旋轉／縮放與重複擺放，包含 DAE 的父子節點；模型與自動碰撞沿用同一擺放。模型大小預設公尺，Y-up；公分來源加 `--unit cm`，Z-up 來源加 `--up-axis z`。`--asset-name chair_v2` 可指定輸出名稱，名稱會轉成 ASCII 小寫並排除路徑符號；空名稱與 Windows 保留名稱會拒絕。
 
@@ -84,9 +84,19 @@ AO 使用紅色通道與 `strength`，乘進線性 diffuse，之後再套 diffus
 
 發布失敗會嘗試還原舊整包；若檔案系統連還原也失敗，錯誤訊息會指明舊備份保留的位置。新整包已發布、但清舊備份失敗時回成功並顯示備份位置，避免上游把成功當失敗重做。兩個程序不要同時寫同一個輸出目錄。
 
+## 直接產 plugin
+
+```bash
+python -m any2nif chair.glb output/Chair --package --plugin --test-cell
+```
+
+整包目錄會多出 `any2nif_chair.esp`（ESL 旗標，只依賴 Skyrim.esm）與產生它的 `modforge-spec.json`，整個目錄就是一個 MO2 mod。plugin 只有一筆 STAT `A2N_Chair`，其 OBND 由實際 NIF 頂點算出，避免邊界為 0 的大型 static 被引擎剔除。`--test-cell` 另加室內格 `A2N_Chair_TestCell`：借 Breezehome 的照明、鋪 Whiterun 室內地板、模型放在原點且最低點貼地、玩家出生點在模型南側；遊戲內 `coc A2N_Chair_TestCell` 即可看到。正式使用時不加 `--test-cell`，再用自己的 plugin 或 CK 擺放 `A2N_Chair`。
+
+plugin 由 ModForge 寫出：預設找同層 `../ModForge` 已建置的 CLI（`dotnet build ../ModForge/src/ModForge.Cli`），或設 `MODFORGE_CLI`／`MODFORGE_DIR`。ModForge 不在、build 失敗或需要非原版 master 時整包失敗並保留舊版。模型邊界超出 int16（約 ±468 公尺）會拒絕，請縮小 `--scale`。這只產 STAT；武器、可撿物品、可動物件不在這條流程內。
+
 ## Manifest
 
-`converter-package.json` 使用 `schema: "model-converter-package/1"`。`mesh` 是相對 Data 目錄的 NIF 路徑；`collision` 是 `none`、`box`、`convex`、`convex-mesh` 或 `json`；`textures` 記 NIF 實際引用的 texture 路徑；`sha256` 將每個產物的相對路徑對應 SHA-256，不含 manifest 自己。
+`converter-package.json` 使用 `schema: "model-converter-package/1"`。`mesh` 是相對 Data 目錄的 NIF 路徑；`collision` 是 `none`、`box`、`convex`、`convex-mesh` 或 `json`；`textures` 記 NIF 實際引用的 texture 路徑；`sha256` 將每個產物的相對路徑對應 SHA-256，不含 manifest 自己。帶 `--plugin` 時另有 `plugin` 物件：`file`、`spec`、`editor_id`、`object_bounds`（[[min x,y,z],[max x,y,z]]），有測試格時再加 `test_cell`；esp 與 spec 也列在 `sha256`。
 
 Manifest 證明的是離線產物與檔案一致性，不是遊戲內驗收。回到有 Skyrim 的機器，仍要檢查模型方向／大小、顏色／透明／發光，以及碰撞是否能阻擋角色；公司 WSL 不會把這些標成已通過。
 

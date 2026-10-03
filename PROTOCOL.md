@@ -169,6 +169,12 @@ JSON 路徑沿用原契約：內容已是 Y-up 公尺，**不再**套來源單�
 
 `--package` 的材質處理、發布與 `model-converter-package/1` manifest 契約見 [PACKAGE.md](PACKAGE.md)；單檔模式不能使用 `--asset-name` 或 `--bake-size`。整包新增的替代 UV／共用 `KHR_texture_transform` 會先烘進 TEXCOORD_0；各槽不同 UV、帶 AO、normal 的 UV 有旋轉／鏡射／不等比縮放，或使用非 REPEAT wrap／nearest magnification 時，改用獨立 atlas 與貼圖重採樣。`--bake-size` 可選 64 到 4096 的二次方尺寸，預設 1024。單檔模式不做這項預處理。無效 UV／採樣設定仍回 exit 2，normal 與 AO 的近似限制見同份文件。
 
+### 整包附 plugin（`--plugin`／`--test-cell`，2026-10-03）
+
+`--package --plugin` 另寫 ESL 旗標的 `any2nif_<name>.esp`（master 只有 Skyrim.esm）：一筆 STAT，EditorID `A2N_<Name>`，Model 指向整包的 NIF，OBND 由寫出的 NIF 三角形頂點算出（Skyrim units，floor/ceil；超出 int16 回 exit 1）。加 `--test-cell` 再寫室內格 `A2N_<Name>_TestCell`：照明複製 Breezehome、`WRIntFloorSTMid01Large` 地板鋪滿模型範圍外加一格、模型最低點放在地板上、`COCMarkerHeading` 在模型南側。單獨 `--test-cell` 或非整包用這兩個旗標都回 exit 1。
+
+plugin 不由本 repo 寫 bytes：先寫可審閱的 `modforge-spec.json`，再黑盒呼叫 ModForge `build`。指令來源依序是 `MODFORGE_CLI`（完整命令前綴，shell 規則切分）→ `MODFORGE_DIR`（ModForge checkout）→ 同層 `../ModForge` 已建置的 `src/ModForge.Cli/bin/Debug/net10.0/ModForge.Cli.dll` 加 `dotnet`。找不到就在轉檔前回 exit 1。ModForge 失敗、沒寫出 `TES4` 開頭的檔，或多出 `<plugin>.requires.txt` 之類 sidecar（代表需要非原版 master）都視為失敗，舊整包保留。ModForge 的 `--test-cell` 需讀 Skyrim.esm 解析照明樣板（`MODFORGE_SKYRIM_DATA`，預設 Steam 路徑）。manifest 多一個選配 `plugin` 物件（`file`、`spec`、`editor_id`、`object_bounds`、`test_cell`），esp 與 spec 也進 `sha256`；schema 仍是 `model-converter-package/1`，不帶 `--plugin` 的輸出不變。
+
 ## 貼圖編碼：`tex2dds`
 
 ```text
@@ -194,4 +200,4 @@ usage: tex2dds [-h] [--format {auto,bc1,bc3}] [--no-mipmaps] [--normal-map] [--r
 
 ## 與 ModForge `package` 的關係
 
-nif→glTF 是**反向**（純預覽代理）；glTF→nif（`gltf2nif`，上節）是**移植方向**，產出的 `.nif`+`.dds` 進 ModForge spec 的 `assets/`，由 `package`（`StaticSpec.Model`）打包。正向（一般外部→nif）決策真相在 [model-porting/](../ModForge/workflows/idea/asset-pipelines/model-porting/README.md)。
+nif→glTF 是**反向**（純預覽代理）；glTF→nif（`gltf2nif`，上節）是**移植方向**，產出的 `.nif`+`.dds` 進 ModForge spec 的 `assets/`，由 `package`（`StaticSpec.Model`）打包。一般外部模型的整包可直接用 `any2nif --package --plugin` 由本工具產 spec 並黑盒呼叫 ModForge `build`（見上「整包附 plugin」）。正向（一般外部→nif）決策真相在 [model-porting/](../ModForge/workflows/idea/asset-pipelines/model-porting/README.md)。

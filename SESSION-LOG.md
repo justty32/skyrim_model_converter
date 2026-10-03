@@ -4,6 +4,8 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 2026-09-14 converter effect 材質 CTD 離線修正完成：`BSEffectShaderProperty` 誤用 lighting-only `Shader Type` 造成多 4-byte prefix，令引擎將 `0xFFFFFFFF` 讀成 `Num Extra Data List`。修正為 Name/count/Controller 的 12-byte prefix；新回歸獨立解碼 payload，舊實作實跑失敗 `(0, 4294967295, 0) != (-1, 0, -1)`。focused **7 passed**，完整 suite **503 passed、80 warnings**，格式證據與實機邊界見 [EFFECT-SHADER-CTD.md](EFFECT-SHADER-CTD.md)。兩個 DS 光柱需回家重產後進原 cell 驗收；本輪未改 consumer skip/materials。
 
+2026-10-03 mc-1003 整包附 plugin 完成：`any2nif --package --plugin [--test-cell]` 由寫出的 NIF 頂點算 OBND，產 `modforge-spec.json` 後黑盒呼叫同層 ModForge `build`，在整包內寫 ESL 旗標的 `any2nif_<name>.esp`（一筆 STAT `A2N_<Name>`；測試格 `A2N_<Name>_TestCell` 借 Breezehome 照明、Whiterun 地板、COCMarkerHeading）。ModForge 缺席／失敗／多出 requires sidecar 時整包失敗並保留舊版。新增 12 個測試，其中一個跑真 ModForge 並以獨立 TES4 解析讀回 ESL 旗標、MAST、STAT 的 EDID／MODL／OBND 與測試格 REFR；把 OBND 軸向改錯的反例使 3 項失敗。完整 suite **513 passed、2 skipped**。houseCARL `read_plugin_file` 另讀回 STAT OBND 0,-71,0..71,0,71、Cell LightingTemplate 06175D。實機尚未驗收。
+
 ## 現役狀態
 
 2026-09-10 MASK 透明裁切修正完成：依 NifTools AlphaFlags／TestFunction 將誤開混合、比較 ALWAYS 的 0x0201 改為關閉混合、GREATER_EQUAL 的 0x1A00；門檻採 ceil(cutoff × 255)，合法 cutoff > 1 使用 NEVER。真 glTF／PNG 經完整 CLI 後直接讀 NIF 與 DDS，驗 0／0.25／0.499／0.5／1／1.1 的比較邊界，另驗 alpha 倍率只存材質、不重複烘入；BLEND 與 raw overrides 既有測試通過。修正前 4 項新測試因錯誤 blend bit 失敗；最終新測試 7 passed，完整 suite **499 passed、80 warnings**。這是離線格式驗證，非遊戲裁切驗收。

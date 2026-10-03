@@ -121,6 +121,11 @@ def convert_package(args):
         _check_destination(destination, source)
         name = _asset_name(args.asset_name or source.stem)
         resolve_scale(args.unit, args.scale)  # Reject invalid scale before expensive baking.
+        if args.test_cell and not args.plugin:
+            raise AnyError("--test-cell requires --plugin")
+        if args.plugin:
+            from .plugin import modforge_command
+            modforge_command()  # Fail before baking when ModForge is not available.
         destination.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix=".any2nif-package-", dir=destination.parent) as temporary:
             staging = Path(temporary)
@@ -146,11 +151,17 @@ def convert_package(args):
             if code:
                 return code
             refs = _validate(data_dir, nif)
+            plugin = None
+            if args.plugin:
+                from .plugin import write_plugin
+                plugin = write_plugin(data_dir, name, nif, test_cell=args.test_cell)
             files = {p.relative_to(data_dir).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                      for p in sorted(data_dir.rglob("*")) if p.is_file()}
             manifest = {"schema": SCHEMA, "mesh": nif.relative_to(data_dir).as_posix(),
                         "collision": collision if collision == "none" or collision in AUTO_MODES else "json",
                         "textures": refs, "sha256": files}
+            if plugin:
+                manifest["plugin"] = plugin
             (data_dir / MANIFEST).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
             # Build failures leave the existing package untouched. Publish failure
             # restores the complete old directory, including its manifest.
@@ -174,6 +185,10 @@ def convert_package(args):
                 except OSError as exc:
                     print(f"warning: new package published; old backup cleanup failed at {backup}: {exc}", file=sys.stderr)
         print(f"wrote package {destination}: {manifest['mesh']}, {len(refs)} texture(s), collision={manifest['collision']}", file=sys.stderr)
+        if plugin:
+            where = f"; test: coc {plugin['test_cell']}" if "test_cell" in plugin else ""
+            print(f"plugin {plugin['file']}: STAT {plugin['editor_id']}, "
+                  f"OBND {plugin['object_bounds'][0]}..{plugin['object_bounds'][1]}{where}", file=sys.stderr)
         return 0
     except AnyError as exc:
         print(f"error: package: {exc}", file=sys.stderr)
