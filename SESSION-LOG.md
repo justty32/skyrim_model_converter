@@ -2,7 +2,7 @@
 
 Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目錄；模型引用的 DDS 全數存在且可解碼；失敗保留既有成品；glTF/GLB、OBJ、FBX 等路徑有離線驗證，CLI／測試／文件對齊。遊戲內外觀與站立驗收另行記錄，不用離線測試冒充。
 
-2026-09-14 converter effect 材質 CTD 離線修正完成：`BSEffectShaderProperty` 誤用 lighting-only `Shader Type` 造成多 4-byte prefix，令引擎將 `0xFFFFFFFF` 讀成 `Num Extra Data List`。修正為 Name/count/Controller 的 12-byte prefix；新回歸獨立解碼 payload，舊實作實跑失敗 `(0, 4294967295, 0) != (-1, 0, -1)`。focused **7 passed**，完整 suite **503 passed、80 warnings**，格式證據與實機邊界見 [EFFECT-SHADER-CTD.md](EFFECT-SHADER-CTD.md)。兩個 DS 光柱需回家重產後進原 cell 驗收；本輪未改 consumer skip/materials。
+2026-09-14 converter effect 材質 CTD 離線修正完成：`BSEffectShaderProperty` 誤用 lighting-only `Shader Type` 造成多 4-byte prefix，令引擎將 `0xFFFFFFFF` 讀成 `Num Extra Data List`。修正為 Name/count/Controller 的 12-byte prefix；新回歸獨立解碼 payload，舊實作實跑失敗 `(0, 4294967295, 0) != (-1, 0, -1)`。focused **7 passed**，完整 suite **503 passed、80 warnings**，格式證據與實機邊界見 [EFFECT-SHADER-CTD.md](EFFECT-SHADER-CTD.md)。兩個 DS 光柱需回家重產後進原 cell 驗收；本輪未改 consumer skip/materials。（2026-10-17 巡檢補記：已結案——darksouls-port `8a8a629` 恢復光柱並釘 `cf12ae9`，2026-09-25 與 10-03 實機進場無 CTD，見 `agentctl/handoffs/home-2026-10-03/dsp/REPORT-r2.md`。）
 
 ## 現役狀態
 

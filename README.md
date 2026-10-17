@@ -75,13 +75,13 @@ MVP 已改自寫純 Python 後端（見下「實作」節），不再依賴外�
 | `nif2gltf/cli.py` | 照 [PROTOCOL.md](PROTOCOL.md)：`--in/--out/--flat`，batch `--manifest/--outdir`，exit 0/1/2/3。 |
 
 **格式來源**：niftools/nifxml `nif.xml`（逐欄查證，非憑記憶；reference 檔 gitignore）。
-**跑**：`python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt`，然後 `python -m nif2gltf --in foo.nif --out foo.gltf --flat`。
-**測**：`.venv/Scripts/python -m pytest`（**499 passed**，2026-09-10 以 `.venv-wsl/bin/python -m pytest -q` 實跑；包含真 FBX2glTF）。
+**跑**：`python -m venv .venv && .venv/bin/python -m pip install -r requirements.txt`（Windows 換 `.venv/Scripts/python`），然後 `python -m nif2gltf --in foo.nif --out foo.gltf --flat`。
+**測**：`.venv/bin/python -m pytest`（**503 passed**，2026-10-17 家用 Linux `.venv` 實跑；含 `tools/bin/FBX2glTF` 0.9.7，缺它時 2 條 FBX 測試會 skip）。
 跨 repo live consumer 測試在同層
 `../godot-worldspace-editor/tests/test_model_fetch_contract.py`：production CLI 的 synthetic
 NIF `.gltf + .bin` 會由 Godot 4.6 production `ModelFetch._load_gltf()` 真正載入，並驗
 mesh/primitive/vertices/軸向尺度與 fail-closed；詳 [PROTOCOL](PROTOCOL.md#live-consumer-contract)。
-**驗證範圍**：合成 fixture 驗解析與寫出契約；SSE 真實石頭／松樹已有 [Godot GUI 歷史驗收](../ModForge/wait_todo/worldspace-editor.md)，LE 真檔與本輪正向整包實機仍待驗。
+**驗證範圍**：合成 fixture 驗解析與寫出契約；SSE 真實石頭／松樹已有 [Godot GUI 歷史驗收](../ModForge/wait_todo/worldspace-editor.md)；正向整包已實機擺放（2026-09-10 SheenChair），布紋／法線／接縫肉眼判定與 LE 真檔仍待驗。
 
 ## 實作（`gltf2nif/` — 反向後端，2026-07-05）
 
@@ -135,7 +135,7 @@ python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--coll
 
 本輪進度與測試環境見 [SESSION-LOG.md](SESSION-LOG.md)。一般靜態物件可加 `--collision box|convex|convex-mesh` 自動產生碰撞，或以 `--package` 一次轉完整模型與 DDS；詳細規則見 [PACKAGE.md](PACKAGE.md)。凹形碰撞自動拆分尚未完成。
 
-- **反向產出實機驗證**（**待主力機**）：`gltf2nif` 輸出的 `.nif`（含碰撞）進遊戲測試 cell，確認看得到、站得上去。離線 round-trip + 對 vanilla byte 核已過，剩實機 acceptance。
+- **反向產出實機驗證**（**已實機擺放，剩肉眼判定**）：`gltf2nif` 輸出的 `.nif`（含碰撞）已進遊戲——2026-09-10 SheenChair 兩包裝進 modpack-main 實機看到（見 [asset-converter](../../wait-user/feature-runtime/asset-converter.md)），2026-09-25／10-03 DS 光柱（effect shader）進場無 CTD。剩布紋／法線／接縫的肉眼判定。
 - **LE 真檔驗證**（待主力機）：SSE 真實石頭／松樹經 `nif2gltf` → Godot 的形狀與 diffuse 已於 2026-06-18 確認，見 [既有驗收紀錄](../ModForge/wait_todo/worldspace-editor.md)。LE 格式仍缺真檔取樣；這份歷史結果不代表今天新增的正向整包或碰撞已經實機驗過。
 - ~~**批量 nif→glTF 的可行載體**~~ ✅ 自寫 `nif2gltf`（上節），不再卡 NifSkope。
 - ~~**協議形狀**~~ ✅ 草案 2026-06-17 [PROTOCOL.md](PROTOCOL.md)：掛勾 `MODFORGE_NIF2GLTF_BIN`（黑盒 exec）、單檔 `--in/--out/--flat`、批量 `manifest.json`、exit code。**參考後端＝本 repo 的 `nif2gltf`**（wrapper 呼 `python -m nif2gltf`）；契約 backend-agnostic，要換後端不動契約。

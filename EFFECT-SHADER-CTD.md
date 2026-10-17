@@ -39,3 +39,6 @@ effect block 尾端等於 source string 後 48 bytes，防止後續欄位或 blo
 離線測試可證明欄位佈局、block size 與其他 converter 契約，但不能證明
 兩個 DS 光柱在 Skyrim 中已不會 CTD，也不能驗收實際 blending/視覺。
 需在有 Skyrim 的環境重產含 effect 材質的 NIF，再進入原 cell 驗收。
+
+**後續（2026-10-17 巡檢補記）**：已在家用 Skyrim 重產並實機驗收——darksouls-port `8a8a629`（2026-09-25）恢復兩個加算光柱，
+2026-09-25 與 10-03 進原 cell 均無 CTD（`agentctl/handoffs/home-2026-10-03/dsp/REPORT-r2.md`：「光柱通過」）。
