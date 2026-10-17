@@ -120,7 +120,7 @@ def run() -> int:
                         help="download the missing pinned SheenChair source")
     args = parser.parse_args()
     project = Path(__file__).resolve().parents[1]
-    home_doc = project / "HOME-VALIDATION.md"
+    home_doc = project / "docs" / "HOME-VALIDATION.md"
     if not home_doc.is_file():
         raise RuntimeError(f"missing required bundle guide: {home_doc}")
     backend = project / "backend" / "home-validation"

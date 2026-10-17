@@ -1,12 +1,12 @@
 # 外部工具與格式調查（MVP 後選型參考）
 
-← [README](README.md)
+← [README](../README.md)
 
 > MVP 已改自寫純 Python 後端（`nif2gltf/`，見 README「實作」節），**不再依賴外部 NIF 工具**。本檔保留作 **MVP 後**（紋理/蒙皮/正向全矩陣）的後端選型參考與格式踩坑備忘。
 
 ## 工具盤點（2026-06-17，Explore agent 核對 repo 既有 finding）
 
-> ⚠️ **幻覺黑名單（勿規劃）**：`amPerl/nif`（Rust `nif2gltf` CLI）**不存在**；`SkyMeshGLTF` 來源存疑。兩者 Gemini 捏造，[nif-gltf finding banner](../ModForge/sub_projs/gemini-research/worldspace-editor/nif-gltf-conversion.md) 已標。
+> ⚠️ **幻覺黑名單（勿規劃）**：`amPerl/nif`（Rust `nif2gltf` CLI）**不存在**；`SkyMeshGLTF` 來源存疑。兩者 Gemini 捏造，[nif-gltf finding banner](../../ModForge/sub_projs/gemini-research/worldspace-editor/nif-gltf-conversion.md) 已標。
 
 | 工具 | 方向 | 平台 | 型態 | 確認度 |
 |---|---|---|---|---|

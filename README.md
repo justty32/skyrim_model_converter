@@ -46,11 +46,20 @@ FBX 另跑 `./tools/fetch_fbx2gltf.sh`，會下載至本專案忽略的 `tools/b
 | [godot-worldspace-editor](../godot-worldspace-editor/README.md) | 消費者 | nif→glTF 代理是它物件編輯的前置依賴 |
 | ModForge `package`（`StaticSpec.Model`） | 消費者 | 正向產出的 `.nif`+`.dds` 由它打包進 Meshes/Textures 樹 |
 
+### 消費者清單（改介面或 main 前先看）
+
+兩個 repo 以**同層 clone** 直接呼叫本 repo 的程式碼（不是走安裝套件），改 CLI、模組路徑或輸出格式會直接打到它們：
+
+| 消費者 | 用到什麼 | 契約測試／釘選 |
+|---|---|---|
+| [godot-worldspace-editor](../godot-worldspace-editor/README.md) | `nif2gltf`：`godot/model_fetch.gd` 用同層 venv 跑 `python -m nif2gltf` 產預覽代理；`tools/nif_textures.py` import `nif2gltf.nif_reader`。路徑可由 `godot/texconfig.json` 覆寫 | 該 repo `tests/test_model_fetch_contract.py` |
+| [darksouls-port](../darksouls-port/README.md) | `gltf2nif`：`tools/p1_batch.py` 以子行程轉 DS 模型；`nif2gltf` reader：`tools/nif_bounds.py`；凸包 `*.hulls.json` 介面：`tools/collision_hulls.py` | 該 repo `p3/converter-pin.json` 釘本 repo **main 的 commit**＋`gltf2nif`／`nif2gltf` 原始碼 sha256；`tests/test_model_converter_contract.py`。main 上任何新 commit 都會讓 DSPort P3 的 pin gate 擋下，純文件修正先放分支 |
+
 ---
 
 ## 外部工具與格式調查
 
-MVP 已改自寫純 Python 後端（見下「實作」節），不再依賴外部 NIF 工具。外部工具盤點（NifSkope fork / PyNifly / Outfit Studio / ck-cmd / Compressonator + 幻覺黑名單）、跨平台 dual-backend 架構難點、紋理 round-trip 踩坑 → 全留 [tool-survey.md](tool-survey.md) 作 **MVP 後**選型參考。
+MVP 已改自寫純 Python 後端（見下「實作」節），不再依賴外部 NIF 工具。外部工具盤點（NifSkope fork / PyNifly / Outfit Studio / ck-cmd / Compressonator + 幻覺黑名單）、跨平台 dual-backend 架構難點、紋理 round-trip 踩坑 → 全留 [tool-survey.md](docs/tool-survey.md) 作 **MVP 後**選型參考。
 
 ---
 
@@ -115,7 +124,7 @@ python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--coll
 | `any2nif/package_bake.py`、`bake_geometry.py` | 跨 UV 圖片重烘、AO 合成、逐實例／primitive 分離與頂點重映射；`tests/test_package_bake.py`、`test_bake_instances.py`、`test_package_normal_frames.py`、`test_package_sampler.py` 驗像素、法線、採樣設定、幾何與失敗保護。 |
 | `any2nif/uv_atlas.py` | xatlas 排版、像素覆蓋與邊緣補色；`tests/test_uv_atlas.py` 驗幾何保留、重疊與細面。 |
 | `any2nif/texture_sampling.py`、`normal_bake.py` | glTF wrap／濾波／sRGB 採樣及法線切線換算；`tests/test_texture_sampling.py`、`test_normal_bake.py` 驗解析值與方向。 |
-| `tools/build_sheen_validation.py` | SheenChair 1024／2048 獨立路徑的驗收包、實際成品與 ZIP 讀回；操作見 [HOME-VALIDATION.md](HOME-VALIDATION.md)。 |
+| `tools/build_sheen_validation.py` | SheenChair 1024／2048 獨立路徑的驗收包、實際成品與 ZIP 讀回；操作見 [HOME-VALIDATION.md](docs/HOME-VALIDATION.md)。 |
 | `tools/smoke_real_assets.py` | 固定來源與 SHA-256 的公開模型下載／離線試轉，含真實網格 UV 衍生案例與 SheenChair DDS 顏色抽查；`tests/test_real_asset_validation.py` 驗抽查器；操作與結果見 [REAL-ASSETS.md](REAL-ASSETS.md)。 |
 | `any2nif/transform.py` | 將來源單位換算成公尺，並把來源 Z-up 正規化成 glTF Y-up；`tests/test_any2nif_transform.py` 驗無效縮放拒絕與負縮放的法線／繞向。 |
 | `any2nif/textures.py` | glTF 圖像轉 Skyrim diffuse／normal／specular／emissive `.dds` 槽位；烘焙法線強度。 |
@@ -133,13 +142,13 @@ python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--coll
 
 ## Open
 
-本輪進度與測試環境見 [SESSION-LOG.md](SESSION-LOG.md)。一般靜態物件可加 `--collision box|convex|convex-mesh` 自動產生碰撞，或以 `--package` 一次轉完整模型與 DDS；詳細規則見 [PACKAGE.md](PACKAGE.md)。凹形碰撞自動拆分尚未完成。
+本輪進度與測試環境見 [SESSION-LOG.md](docs/SESSION-LOG.md)。一般靜態物件可加 `--collision box|convex|convex-mesh` 自動產生碰撞，或以 `--package` 一次轉完整模型與 DDS；詳細規則見 [PACKAGE.md](PACKAGE.md)。凹形碰撞自動拆分尚未完成。
 
 - **反向產出實機驗證**（**已實機擺放，剩肉眼判定**）：`gltf2nif` 輸出的 `.nif`（含碰撞）已進遊戲——2026-09-10 SheenChair 兩包裝進 modpack-main 實機看到（見 [asset-converter](../../wait-user/feature-runtime/asset-converter.md)），2026-09-25／10-03 DS 光柱（effect shader）進場無 CTD。剩布紋／法線／接縫的肉眼判定。
 - **LE 真檔驗證**（待主力機）：SSE 真實石頭／松樹經 `nif2gltf` → Godot 的形狀與 diffuse 已於 2026-06-18 確認，見 [既有驗收紀錄](../ModForge/wait_todo/worldspace-editor.md)。LE 格式仍缺真檔取樣；這份歷史結果不代表今天新增的正向整包或碰撞已經實機驗過。
 - ~~**批量 nif→glTF 的可行載體**~~ ✅ 自寫 `nif2gltf`（上節），不再卡 NifSkope。
 - ~~**協議形狀**~~ ✅ 草案 2026-06-17 [PROTOCOL.md](PROTOCOL.md)：掛勾 `MODFORGE_NIF2GLTF_BIN`（黑盒 exec）、單檔 `--in/--out/--flat`、批量 `manifest.json`、exit code。**參考後端＝本 repo 的 `nif2gltf`**（wrapper 呼 `python -m nif2gltf`）；契約 backend-agnostic，要換後端不動契約。
-- ~~**與 model-porting 的邊界**~~ ✅ 選型細節留在 model-porting／[AUDIT.md](AUDIT.md)，本 repo 收斂可執行的正反向工具與 CLI 契約。
+- ~~**與 model-porting 的邊界**~~ ✅ 選型細節留在 model-porting／[AUDIT.md](docs/AUDIT.md)，本 repo 收斂可執行的正反向工具與 CLI 契約。
 - **`.3ds`**：trimesh 不支援；assimp 需要 sudo 安裝，本輪無法採用。
 - **蒙皮／骨架**：`gltf2nif` 明確拒絕帶 skin／動畫的輸入，現階段只支援靜態 mesh。
 - **BC7**：未實作；目前 `tex2dds` 的 BC1／BC3 已足以覆蓋本輪需求。

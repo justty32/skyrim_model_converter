@@ -1,13 +1,13 @@
 # AUDIT — 正向管線（常見格式 → Skyrim `.nif` + `.dds`）選型
 
-← [README](README.md) ｜ 2026-09-05 15:45–16:00，`lead-mc`。本檔是 `any2nif` / `tex2dds` 開工前的實裝驗證與選型結論。
+← [README](../README.md) ｜ 2026-09-05 15:45–16:00，`lead-mc`。本檔是 `any2nif` / `tex2dds` 開工前的實裝驗證與選型結論。
 
 ## 1. 現況 baseline（實跑，非推論）
 
 | 項 | 結果 |
 |---|---|
 | repo HEAD | 開工時 detached `2c09125`；已 `git checkout main` + `git pull --ff-only` 快轉到 `2c09125` |
-| `.venv` | **是壞的**：`pyvenv.cfg` 的 `command` 還指 `/home/lorkhan/repo/ModForge/sub_projs/model-converter/.venv`，`bin/pip` 這類帶 shebang 的腳本 exit 127。但 `bin/python` 是指向 `/usr/bin/python3` 的 symlink，`sys.prefix` 由目錄推導 → **`.venv/bin/python -m pip` 可用**，不必重建 |
+| `.venv` | **是壞的**：`pyvenv.cfg` 的 `command` 還指 `/home/lorkhan/repo/ModForge/sub_projs/model-converter/.venv`，`bin/pip` 這類帶 shebang 的腳本 exit 127。但 `bin/python` 是指向 `/usr/bin/python3` 的 symlink，`sys.prefix` 由目錄推導 → **`.venv/bin/python -m pip` 可用**，不必重建<br>**2026-10-17 複查（現況，未重建）**：舊路徑 `/home/lorkhan/repo/ModForge/` 已不存在，`pyvenv.cfg` 的 `command` 仍指它、`bin/pip` 仍 exit 127（bad interpreter）；`bin/python` 仍是 `/usr/bin/python3` symlink，現為 3.14.7（`pyvenv.cfg` 記 3.14.5），`sys.prefix` 正確解析到 `projects/model-converter/.venv`，`.venv/bin/python -m pip` 26.1.1 可用。結論不變：一律用 `.venv/bin/python -m …`，不要直接呼叫 `bin/` 下的腳本 |
 | 既有測試 | `.venv/bin/python -m pytest -q` → **68 passed in 0.31s** ✅ |
 | darksouls-port contract test | `projects/darksouls-port/venv/bin/python -m unittest tests.test_model_converter_contract` → **Ran 2 tests, OK** ✅（該 repo 有自己的 `venv/`，需要 `soulstruct`；用 model-converter 的 venv 跑會 collection error，這不是回歸） |
 | venv 既有套件 | numpy 2.4.6、scipy 1.18.0、pygltflib 1.16.5、pytest 9.1.0、**trimesh 5.0.0**、**vhacdx 0.0.10**、constrata、zstandard。（工作記憶說「pip 沒有 trimesh」是**錯的**，實測已裝） |

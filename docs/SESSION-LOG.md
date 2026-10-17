@@ -2,7 +2,7 @@
 
 Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目錄；模型引用的 DDS 全數存在且可解碼；失敗保留既有成品；glTF/GLB、OBJ、FBX 等路徑有離線驗證，CLI／測試／文件對齊。遊戲內外觀與站立驗收另行記錄，不用離線測試冒充。
 
-2026-09-14 converter effect 材質 CTD 離線修正完成：`BSEffectShaderProperty` 誤用 lighting-only `Shader Type` 造成多 4-byte prefix，令引擎將 `0xFFFFFFFF` 讀成 `Num Extra Data List`。修正為 Name/count/Controller 的 12-byte prefix；新回歸獨立解碼 payload，舊實作實跑失敗 `(0, 4294967295, 0) != (-1, 0, -1)`。focused **7 passed**，完整 suite **503 passed、80 warnings**，格式證據與實機邊界見 [EFFECT-SHADER-CTD.md](EFFECT-SHADER-CTD.md)。兩個 DS 光柱需回家重產後進原 cell 驗收；本輪未改 consumer skip/materials。（2026-10-17 巡檢補記：已結案——darksouls-port `8a8a629` 恢復光柱並釘 `cf12ae9`，2026-09-25 與 10-03 實機進場無 CTD，見 `agentctl/handoffs/home-2026-10-03/dsp/REPORT-r2.md`。）
+2026-09-14 converter effect 材質 CTD 離線修正完成：`BSEffectShaderProperty` 誤用 lighting-only `Shader Type` 造成多 4-byte prefix，令引擎將 `0xFFFFFFFF` 讀成 `Num Extra Data List`。修正為 Name/count/Controller 的 12-byte prefix；新回歸獨立解碼 payload，舊實作實跑失敗 `(0, 4294967295, 0) != (-1, 0, -1)`。focused **7 passed**，完整 suite **503 passed、80 warnings**，格式證據與實機邊界見 [EFFECT-SHADER-CTD.md](../EFFECT-SHADER-CTD.md)。兩個 DS 光柱需回家重產後進原 cell 驗收；本輪未改 consumer skip/materials。（2026-10-17 巡檢補記：已結案——darksouls-port `8a8a629` 恢復光柱並釘 `cf12ae9`，2026-09-25 與 10-03 實機進場無 CTD，見 `agentctl/handoffs/home-2026-10-03/dsp/REPORT-r2.md`。）
 
 ## 現役狀態
 
@@ -32,19 +32,19 @@ SheenChair 六個來源材質均為 OPAQUE，透明裁切修正不影響最新 `
 
 2026-09-10 跨 UV 重烘已完成：不同槽的座標／變換自動排成逐 primitive／實例獨立 atlas，支援 wrap／採樣、線性 diffuse × AO、normal 切線換算及負縮放；`--bake-size` 64～4096，預設 1024。所有面皆檢查像素覆蓋，極細面配置獨立小區塊；沒有安全空間就要求提高尺寸並保留舊成品。新增 xatlas 0.0.11，僅裝專案 `.venv-wsl`。
 
-本輪 Done when 已達成：SheenChair 原版成功產出 4 shapes、39,936 三角形、6 個實際 DDS 引用、4 凸包；四材質 diffuse 抽查平均誤差 0.0044～0.0097，黑圖反例確實被拒。最終真實模型腳本四案例全數通過；細節與固定來源在 [REAL-ASSETS](REAL-ASSETS.md)。normal 方向、紅色大面／藍色微小島、重複擺放、非 triangle 略過與錯誤保護另有合成測試。
+本輪 Done when 已達成：SheenChair 原版成功產出 4 shapes、39,936 三角形、6 個實際 DDS 引用、4 凸包；四材質 diffuse 抽查平均誤差 0.0044～0.0097，黑圖反例確實被拒。最終真實模型腳本四案例全數通過；細節與固定來源在 [REAL-ASSETS](../REAL-ASSETS.md)。normal 方向、紅色大面／藍色微小島、重複擺放、非 triangle 略過與錯誤保護另有合成測試。
 
 4096 四槽合成模型完整 CLI 試轉 exit 0，約 89 秒、峰值 RSS 1,595,832 KiB（約 1.52 GiB）；烘焙逐槽／分塊處理，不把所有槽的浮點 atlas 同時常駐。來源／成品留忽略的 `backend/bake-memory/`。
 
 2026-09-10 真實模型與 UV 續行已完成：整包支援替代 UV、共用 KHR_texture_transform 的位移／旋轉／縮放／texCoord 覆寫，烘進單一 NIF UV。當時帶 normal 時限正值等比縮放與位移，不同槽的 UV 對應也仍拒絕；這些限制現已由重烘補上，normal 零縮放仍拒絕。新增 25 個測試，實際讀回 NIF 座標、normal DDS 引用並驗失敗保護。
 
-公開模型試轉與來源見 [REAL-ASSETS.md](REAL-ASSETS.md)：Lantern、Avocado 原版與 LanternUV 衍生版通過；SheenChair 原先因混合 UV 拒絕，現已成功試轉。`tools/smoke_real_assets.py` 固定來源版本與 SHA-256，素材／產物留忽略的 `backend/real-assets/`。整支腳本已實跑通過，包含三角形／位置／UV 讀回；尚無遊戲畫面驗收。
+公開模型試轉與來源見 [REAL-ASSETS.md](../REAL-ASSETS.md)：Lantern、Avocado 原版與 LanternUV 衍生版通過；SheenChair 原先因混合 UV 拒絕，現已成功試轉。`tools/smoke_real_assets.py` 固定來源版本與 SHA-256，素材／產物留忽略的 `backend/real-assets/`。整支腳本已實跑通過，包含三角形／位置／UV 讀回；尚無遊戲畫面驗收。
 
 2026-09-10 分件碰撞已完成：`--collision convex-mesh` 依正規化後的 node × primitive 各自建立凸包。離線驗證分件門框保留空隙、重複擺放與尺度軸向、多凸包 NIF 引用，以及 65,538 頂點完整整包的渲染切分不改碰撞分組。單一 primitive 的凹洞仍不會自動拆分。
 
 2026-09-10 續行已完成：`normalTexture.scale` 改為烘進法線貼圖，支援歸零、減弱、加強與負值；非有限值仍拒絕。整包測試實際讀回 NIF 引用的 DDS，確認共用 diffuse 不受影響、重跑一致、壞設定保留既有整包。
 
-2026-09-10 公司 WSL：使用者選定的一鍵一般模型流程已完成離線實作，使用方式見 [PACKAGE.md](PACKAGE.md)。實機外觀／尺寸方向／碰撞站立仍待回家驗收，記在母 repo 的 [WAIT_USER](../../wait-user/feature-runtime.md#asset-converter-一鍵靜態模型整包2026-09-10)。
+2026-09-10 公司 WSL：使用者選定的一鍵一般模型流程已完成離線實作，使用方式見 [PACKAGE.md](../PACKAGE.md)。實機外觀／尺寸方向／碰撞站立仍待回家驗收，記在母 repo 的 [WAIT_USER](../../../wait-user/feature-runtime.md#asset-converter-一鍵靜態模型整包2026-09-10)。
 
 本次獨立 WSL 環境在 `.venv-wsl`，由既有 uv 建立；FBX2glTF 在忽略的 `tools/bin/`。Windows `.venv` 保留。使用者已授權專案內安裝依賴與 push。
 
