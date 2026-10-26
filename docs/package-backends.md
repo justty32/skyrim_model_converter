@@ -37,4 +37,3 @@
 | `tex2dds/pipeline.py` | 解碼、pow2 resize、normal green flip、mipmap chain 與格式選擇。 |
 | `tex2dds/bcn.py` | 純 Python BC1／BC3 block encoder。 |
 | `tex2dds/dds.py` | 寫入 DXT1／DXT5 DDS header 與 mip payload。 |
-

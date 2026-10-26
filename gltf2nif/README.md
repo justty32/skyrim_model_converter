@@ -4,7 +4,7 @@
 
 model-converter 的**反向後端**：把 glTF 2.0 靜態 mesh 寫成 Skyrim Special Edition 的 `.nif`（`BSTriShape` 幾何 + `BSLightingShaderProperty` 材質 + 選配 `bhk` 碰撞）。直接服務 [darksouls-port](../../darksouls-port/plan.md) 的 `FLVER→glTF→NIF` 管線。
 
-**第一道驗證＝round-trip**：寫出的 `.nif` 丟回 `nif2gltf` parser 讀，三角形/頂點/UV/貼圖路徑要對得回輸入 glTF。這可驗可讀性，不能單獨排除 writer 與測試共享錯誤 offset；靜態 lighting/collision 佈局另對過真實 vanilla SSE NIF，格式特定欄位以固定版本 NifTools schema 與獨立 bytes 解碼核對。effect prefix 因舊測試沿用錯誤 offset 而未被擋下，修正證據見 [EFFECT-SHADER-CTD.md](../EFFECT-SHADER-CTD.md)。
+**第一道驗證＝round-trip**：寫出的 `.nif` 丟回 `nif2gltf` parser 讀，三角形/頂點/UV/貼圖路徑要對得回輸入 glTF。這可驗可讀性，不能單獨排除 writer 與測試共享錯誤 offset；靜態 lighting/collision 佈局另對過真實 vanilla SSE NIF，格式特定欄位以固定版本 NifTools schema 與獨立 bytes 解碼核對。effect prefix 的格式證據見 [EFFECT-SHADER-CTD.md](../EFFECT-SHADER-CTD.md)。
 
 ## 用法
 
@@ -79,4 +79,4 @@ hulls JSON 格式（座標＝**公尺、DS 原生 Y-up**，與 glTF 同系）：
 
 ## 測試
 
-`.venv/bin/python -m pytest`（gltf2nif 28 綠：geometry 8、reader 4、writer 12、CLI 5，外加現有 nif2gltf 24）。主驗證＝writer→`nif2gltf` round-trip；另含座標釘點、凸包面數、CLI 契約、m0046 實件。
+`.venv/bin/python -m pytest -q`。主驗證＝writer→`nif2gltf` round-trip；另含座標釘點、凸包面數、CLI 契約、m0046 實件。

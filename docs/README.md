@@ -11,7 +11,7 @@
 | 既有資產 | 方向 | 角色 |
 |---|---|---|
 | [model-porting/](../../ModForge/workflows/idea/asset-pipelines/model-porting/README.md)（01–10） | **正向** 外部→nif | 正向 deep-dive 的真相在那裡；本工具正向部分**沿用**其工具決策（NifTools 靜態 / PyNifly 蒙皮 / Compressonator dds），不複製內容 |
-| [gemini-research/.../nif-gltf-conversion.md](../../ModForge/sub_projs/gemini-research/worldspace-editor/nif-gltf-conversion.md) | **反向** nif→glTF | 反向工具調查的**唯一**現有來源（已帶幻覺更正 banner）；結論濃縮進下方工具表，原稿留存 |
+| [gemini-research/.../nif-gltf-conversion.md](../../ModForge/sub_projs/gemini-research/worldspace-editor/nif-gltf-conversion.md) | **反向** nif→glTF | 反向工具調查的**唯一**現有來源（已帶幻覺更正 banner）；工具表見 [tool-survey.md](../tool-survey.md)，原稿留存 |
 | [godot-worldspace-editor](../../godot-worldspace-editor/README.md) | 消費者 | nif→glTF 代理是它物件編輯的前置依賴 |
 | ModForge `package`（`StaticSpec.Model`） | 消費者 | 正向產出的 `.nif`+`.dds` 由它打包進 Meshes/Textures 樹 |
 
@@ -19,14 +19,13 @@
 
 ## 外部工具與格式調查
 
-MVP 已改自寫純 Python 後端（見下「實作」節），不再依賴外部 NIF 工具。外部工具盤點（NifSkope fork / PyNifly / Outfit Studio / ck-cmd / Compressonator + 幻覺黑名單）、跨平台 dual-backend 架構難點、紋理 round-trip 踩坑 → 全留 [tool-survey.md](../tool-survey.md) 作 **MVP 後**選型參考。
+「實作」見 [NIF 雙向後端](nif-backends.md)：自寫純 Python，不依賴外部 NIF 工具。外部工具盤點（NifSkope fork / PyNifly / Outfit Studio / ck-cmd / Compressonator + 幻覺黑名單）、跨平台 dual-backend 架構難點、紋理 round-trip 踩坑 → 全留 [tool-survey.md](../tool-survey.md) 作 **MVP 後**選型參考。
 
 ---
 
 ## Scope
 
-**MVP（已鎖，2026-06-17）：vanilla `.nif` → glTF 批量轉換**——靜態 mesh、Linux 原生、**跳紋理用平色 proxy**，輸出餵 [worldspace editor](../../godot-worldspace-editor/README.md) 當物件代理。
-一鎚解三件事：① 填上「無已驗證批量 nif→glTF」缺口；② 讓 worldspace 物件編輯能往前走；③ 避開 PyNifly 的 Windows 鎖（靜態走 NifSkope fo76utils fork 即可，Linux 原生）。
+**MVP：vanilla `.nif` → glTF 批量轉換**——靜態 mesh、Linux 原生、**跳紋理用平色 proxy**，輸出餵 [worldspace editor](../../godot-worldspace-editor/README.md) 當物件代理。
+外部工具的「無已驗證批量 nif→glTF」限制見工具調查；本工具的靜態轉換由純 Python 後端提供。
 
 **完整目標（MVP 後）**：`.nif`+紋理 ↔ glTF/Godot ↔ FBX/OBJ 全矩陣雙向，含紋理重映射與蒙皮（蒙皮走 Windows/PyNifly 後端）。
-
