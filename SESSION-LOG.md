@@ -55,3 +55,7 @@ SheenChair 六個來源材質均為 OPAQUE，透明裁切修正不影響最新 `
 ## 後續方向
 
 跨 UV 重烘已完成；共用 UV 的 normal 旋轉／鏡射／不等比縮放也已路由重烘，零縮放仍拒絕。共用 UV 的非 REPEAT／nearest sampler 已路由重烘。True PBR、反向貼圖、蒙皮／動畫、凹形碰撞自動拆分與 ModForge spec 的黑盒接線仍是另外的工作。本輪不宣稱這些已完成；舊 idea 的入口已改標目前實作與歷史方案。
+
+## 文件整理（2026-10-26，cx-sq-mc）
+
+- [tidy] 文件拆分與內容精簡進行中；Done when: BRIEF 五條驗收有結果且 WORKER-REPORT 已交付。

@@ -38,43 +38,11 @@ python -m any2nif doorway.glb output/Doorway --package --collision convex-mesh
 
 ## 貼圖與材質
 
-PLY 等 trimesh 來源的頂點顏色會保留到 NIF。來源按面指定顏色時，會先拆開共用頂點，避免相鄰面的顏色被平均混合；三角形位置與原本法線保留。沒有來源顏色時不額外加入預設灰色。這只保留顏色資料，透明混合仍由材質的 alpha 設定決定。NIF 的 VertexAttribute 與 SkyrimShaderPropertyFlags2 顏色標記皆使用 bit 5（0x20），依 [NifTools 格式定義](https://github.com/niftools/nifxml/blob/develop/nif.xml)；舊版誤用的 Instance／Assume_Shadowmask 位元已修正。
-
-每個材質會取得 `material_0000` 這類獨立名稱，來源的空名、同名或路徑字串不會造成互相覆蓋。glTF／GLB 內嵌、data URI、外部影像都會先讀取；指定卻缺失或壞掉的影像會報錯，整包不發布。
-
-diffuse 的 RGB 顏色倍率會在線性色彩空間乘上原圖，再轉回 sRGB。沒有 diffuse 的材質會產生純色圖；沒有材質的 primitive 使用白色圖。Alpha 倍率保留給 NIF 材質，避免在貼圖和材質各乘一次。
-
-`MASK` 使用 alpha test、關閉混合，保留大於等於門檻的像素；依 [NifTools AlphaFlags／TestFunction](https://github.com/niftools/nifxml/blob/develop/nif.xml) 寫出 0x1A00。門檻為 `ceil(clamp(alphaCutoff, 0, 1) × 255)`；cutoff 大於 1 時使用 NEVER 比較，整個材質透明，符合 [glTF cutoff 定義](https://raw.githubusercontent.com/KhronosGroup/glTF/main/specification/2.0/schema/material.schema.json)。NIF 的 8-bit 門檻、DDS 壓縮與遊戲濾波仍有量化誤差。舊版 MASK 的 0x0201 實際開啟混合且比較為 ALWAYS，這類模型需重轉。BLEND 與明確指定的原始 flags／threshold 維持既有行為。
-
-diffuse 輸出 BC1／BC3；normal 會先將 `normalTexture.scale` 烘進法線的 X／Y 分量並重新正規化，再使用 BC3 並翻轉綠色通道；specular 與 emissive 輸出 BC1。全部生成二次方尺寸與完整 mipmap。輸出後重新讀取 NIF 的 `BSShaderTextureSet`，逐一核對檔案存在、DDS 編碼、完整 mip 資料長度，並由 Pillow 解碼。
-
-傳統 Skyrim 材質不是完整 PBR。Metallic／roughness 以既有公式近似，roughness 影像反相為 specular mask；`KHR_materials_specular` 有提供時優先採用。True PBR、材質的完全等價轉換與凹形碰撞自動拆分仍未實作。骨架、動畫、morph 與 sparse accessor 沿用靜態後端的拒絕規則。
-
-來源同時提供 `NORMAL` 與 `TANGENT` 時，`any2nif` 會保留切線方向及正反手性，連同 node transform、`--up-axis`、負縮放與大模型切分一起傳到 NIF。共用 UV 的直通路徑不因此重排 UV 或放大貼圖，避免丟失來源的凹凸方向。缺少 `NORMAL` 時忽略來源 `TANGENT`；生成法線仍沿用既有平滑近似。來源切線必須是與頂點數相符的 FLOAT VEC4、方向有限且非零、W 為 ±1，不能與 normal 平行；壞資料回 exit 2 並保留舊包。bitangent 的關係依 [glTF mesh 規格](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#meshes-overview)。缺來源 TANGENT 時也會依 UV 的正反方向生成切線，鏡射 UV 的直通貼圖保持原尺寸。鏡射接縫會複製頂點，讓同一個三角形的正反手性一致；重烘與最終 NIF 使用相同的逐角點切線，先生成再切分大型模型，保留跨分件的平滑方向。完全退化的 UV 仍使用固定備援方向。
-
-法線強度支援 0（消除傾斜）、介於 0 與 1（減弱）、大於 1（加強）及負值（反轉 X／Y）；NaN／Infinity 會報錯。計算依 [glTF normalTexture.scale 定義](https://raw.githubusercontent.com/KhronosGroup/glTF/main/specification/2.0/schema/material.normalTextureInfo.schema.json)，在壓縮前烘焙，因此仍有 DDS 壓縮與濾波誤差。
-
-整包支援替代 `TEXCOORD_n`，以及 `KHR_texture_transform` 的位移、旋轉、縮放與 `texCoord` 覆寫。各貼圖共用座標集與變換時，轉換器會把結果直接烘進 NIF 的單一 UV，原始模型不變。變換順序依 [Khronos 規格](https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_texture_transform)：先縮放、再旋轉、最後位移。支援 float 與正規化 unsigned byte／short UV；缺少指定座標、非有限值或超出 NIF 半精度範圍會拒絕。
-
-共用 UV 帶 normal 時，正值等比縮放與位移可直接烘進座標；旋轉、鏡射或不等比縮放會自動走下方的貼圖重烘，換算法線方向。normal 的 UV 零縮放會拒絕，因為無法確定完整切線方向。不同貼圖各用不同座標時，同樣改走貼圖重烘流程。這些新支援只作用於 `--package`；單檔模式的後端仍讀 TEXCOORD_0。只靠 image-source extension、沒有一般 `texture.source` 的材質也仍報錯。
+見 [整包貼圖與材質](package/README.md)：頂點色、命名、alpha、DDS、切線與 UV 契約。
 
 ### 不同貼圖使用不同 UV
 
-`--package` 遇到各貼圖的座標集／變換不同、帶 AO 陰影圖、normal 的 UV 有旋轉／鏡射／不等比縮放，或 sampler 使用邊緣延伸／鏡射重複／nearest 時，會自動用 [xatlas](https://github.com/mworchel/xatlas-python) 排出沒有重疊的共用 UV，再把各張圖按原本 UV 重採樣。每個來源 primitive／擺放實例各有自己的材質與貼圖；UV 接縫增加頂點，但保持三角形的位置、順序、法線與頂點色。node 的位移／旋轉／縮放先套進幾何，避免不同擺放共用錯誤的法線烘焙。
-
-預設每張烘焙圖是 1024 × 1024；想保留更多布紋細節可提高尺寸：
-
-```bash
-python -m any2nif SheenChair.glb output/SheenChair --package --collision convex-mesh --bake-size 2048
-```
-
-`--bake-size` 只供整包模式使用，可選 64、128、256、512、1024、2048、4096。較大尺寸增加時間、記憶體與成品大小；它不會增加來源圖本來沒有的細節，也不改共用 UV 直通流程的原圖大小。重烘是有限解析度近似，密集重複花紋與低階 mipmap 仍可能模糊或產生接縫。小到沒有像素中心、或 NIF 半精度 UV 壓縮後塌縮的面，會自動取得獨立小區塊，從自己的來源 UV 取色；最後檢查每個面都有像素覆蓋。若空間不足，會要求提高 `--bake-size` 並保留舊成品。
-
-採樣支援 REPEAT、MIRRORED_REPEAT、CLAMP_TO_EDGE，以及 nearest／bilinear；共用 UV 的非預設 sampler 也會自動重烘，無效 sampler 索引／wrap／filter 會拒絕。RGB 色圖在線性空間取樣，normal、roughness、AO 等資料圖不做 sRGB 轉換。烘焙以來源最高解析度取樣，未模擬視角相關的來源 mip／anisotropic 濾波。Atlas 預留外圈供小區塊補救，未覆蓋區域補最近的邊緣顏色，再交給既有 DDS 完整 mipmap 流程。4096 的四槽合成模型完整試轉約 89 秒、峰值記憶體約 1.52 GiB（本次 WSL 實測，非所有模型的上限）。
-
-AO 使用紅色通道與 `strength`，乘進線性 diffuse，之後再套 diffuse RGB factor；alpha 不乘 AO。這是傳統 Skyrim 的陰影近似，會讓直接光照也變暗，並非 glTF 的環境光遮蔽等價實作。normal 會先套強度，再按原 UV 與新 UV 的切線方向換算；有來源 tangent 時保留其方向與 handedness，再依 UV 變換換算；沒有來源 tangent 時，從 UV 的兩個方向求切線與正反手性，包含鏡射 UV；生成方式仍是平滑近似，並非 MikkTSpace。normal 變換需要可逆的 UV 縮放。超過 NIF 頂點／三角形上限時保留切分前已生成的切線方向。負 `--scale` 的鏡射由 NIF 切線正反手性處理。Sheen 與材質 variants 仍不轉成 Skyrim 對等效果，使用來源預設材質。
-
-公開真實模型的固定版本、試轉結果與可重跑指令見 [REAL-ASSETS.md](REAL-ASSETS.md)。
+見 [UV 重烘規則](package/texture-baking.md)：觸發條件、尺寸、採樣與近似限制。
 
 ## 重跑與失敗
 

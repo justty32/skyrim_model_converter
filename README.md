@@ -39,97 +39,31 @@ FBX 另跑 `./tools/fetch_fbx2gltf.sh`，會下載至本專案忽略的 `tools/b
 
 ## 關係定位（不重造輪子）
 
-| 既有資產 | 方向 | 角色 |
-|---|---|---|
-| [model-porting/](../ModForge/workflows/idea/asset-pipelines/model-porting/README.md)（01–10） | **正向** 外部→nif | 正向 deep-dive 的真相在那裡；本工具正向部分**沿用**其工具決策（NifTools 靜態 / PyNifly 蒙皮 / Compressonator dds），不複製內容 |
-| [gemini-research/.../nif-gltf-conversion.md](../ModForge/sub_projs/gemini-research/worldspace-editor/nif-gltf-conversion.md) | **反向** nif→glTF | 反向工具調查的**唯一**現有來源（已帶幻覺更正 banner）；結論濃縮進下方工具表，原稿留存 |
-| [godot-worldspace-editor](../godot-worldspace-editor/README.md) | 消費者 | nif→glTF 代理是它物件編輯的前置依賴 |
-| ModForge `package`（`StaticSpec.Model`） | 消費者 | 正向產出的 `.nif`+`.dds` 由它打包進 Meshes/Textures 樹 |
-
----
+見 [docs/README.md](docs/README.md)。
 
 ## 外部工具與格式調查
 
-MVP 已改自寫純 Python 後端（見下「實作」節），不再依賴外部 NIF 工具。外部工具盤點（NifSkope fork / PyNifly / Outfit Studio / ck-cmd / Compressonator + 幻覺黑名單）、跨平台 dual-backend 架構難點、紋理 round-trip 踩坑 → 全留 [tool-survey.md](tool-survey.md) 作 **MVP 後**選型參考。
-
----
+見 [docs/README.md](docs/README.md)。
 
 ## Scope
 
-**MVP（已鎖，2026-06-17）：vanilla `.nif` → glTF 批量轉換**——靜態 mesh、Linux 原生、**跳紋理用平色 proxy**，輸出餵 [worldspace editor](../godot-worldspace-editor/README.md) 當物件代理。
-一鎚解三件事：① 填上「無已驗證批量 nif→glTF」缺口；② 讓 worldspace 物件編輯能往前走；③ 避開 PyNifly 的 Windows 鎖（靜態走 NifSkope fo76utils fork 即可，Linux 原生）。
-
-**完整目標（MVP 後）**：`.nif`+紋理 ↔ glTF/Godot ↔ FBX/OBJ 全矩陣雙向，含紋理重映射與蒙皮（蒙皮走 Windows/PyNifly 後端）。
+見 [docs/README.md](docs/README.md)。
 
 ## 實作（`nif2gltf/` — 自寫載體，2026-06-17 離線）
 
-原本 MVP 第一關卡在「NifSkope fork 有沒有 CLI」。改走 README 自留的後路——**自寫靜態 NIF mesh parser**，因此不再依賴任何外部 NIF 工具，Linux/Win 原生跑。
-
-| 模組 | 職責 |
-|---|---|
-| `nif2gltf/nif_reader.py` | 手寫 Skyrim NIF（20.2.0.7 / user 12）靜態 mesh 解析的**入口與裝配**：標頭解析、NiNode 樹 transform 組合、Skyrim(Z-up)→glTF(Y-up)、含 skin/動畫→拒（exit 3）、`read_nif` 主流程。**Block Size 給每塊邊界 offset，單塊解析漂移不會骨牌**。公開 API（`read_nif`/`NifError`/`SkinnedNifError`）由此 re-export。 |
-| `nif2gltf/_binreader.py` | 二進位讀取原語：`NifError`/`SkinnedNifError` 例外 + `_Reader`（byte cursor、scalar/vec/mat 解碼）。 |
-| `nif2gltf/_blocks.py` | 各 block 型別解碼：**LE** NiTriShape/NiTriStrips→NiTriShapeData/NiTriStripsData（全 float）；**SSE** BSTriShape/BSDynamic/BSSubIndex（BSVertexData，走 BSVertexDesc offset 表 + Full_Precision 旗標自描述解碼）；NiNode、反三角條（de-strip）、半精度解碼。 |
-| `nif2gltf/gltf_writer.py` | `Mesh` IR → glTF 2.0（`.gltf`+`.bin`，pygltflib）。POSITION/NORMAL/TEXCOORD_0 + 單一平色 material（`--flat`）。 |
-| `nif2gltf/geometry.py` | `Mesh` 中介表示 + Skyrim→glTF 軸轉。 |
-| `nif2gltf/cli.py` | 照 [PROTOCOL.md](PROTOCOL.md)：`--in/--out/--flat`，batch `--manifest/--outdir`，exit 0/1/2/3。 |
-
-**格式來源**：niftools/nifxml `nif.xml`（逐欄查證，非憑記憶；reference 檔 gitignore）。
-**跑**：`python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt`，然後 `python -m nif2gltf --in foo.nif --out foo.gltf --flat`。
-**測**：`.venv/Scripts/python -m pytest`（**499 passed**，2026-09-10 以 `.venv-wsl/bin/python -m pytest -q` 實跑；包含真 FBX2glTF）。
-跨 repo live consumer 測試在同層
-`../godot-worldspace-editor/tests/test_model_fetch_contract.py`：production CLI 的 synthetic
-NIF `.gltf + .bin` 會由 Godot 4.6 production `ModelFetch._load_gltf()` 真正載入，並驗
-mesh/primitive/vertices/軸向尺度與 fail-closed；詳 [PROTOCOL](PROTOCOL.md#live-consumer-contract)。
-**驗證範圍**：合成 fixture 驗解析與寫出契約；SSE 真實石頭／松樹已有 [Godot GUI 歷史驗收](../ModForge/wait_todo/worldspace-editor.md)，LE 真檔與本輪正向整包實機仍待驗。
+見 [docs/nif-backends.md](docs/nif-backends.md)。
 
 ## 實作（`gltf2nif/` — 反向後端，2026-07-05）
 
-反向缺口（glTF 靜態 mesh → SSE `.nif`）已補：見 **[gltf2nif/README.md](gltf2nif/README.md)**。鏡射 `nif2gltf` 的結構，以 round-trip 驗證幾何與可讀性；但 writer/reader 可能共享錯誤假設，格式欄位另以固定版本 NifTools schema、獨立 bytes 解碼與可得的真實 NIF 取樣核對。
-
-```
-python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--collision hulls.json]
-```
-
-- **幾何** `BSTriShape`（full-precision 佈局 stride 28，座標 glTF Y-up 公尺 → Skyrim Z-up ×70.03）
-- `gltf2nif/tangents.py` 驗證並保留來源切線方向與 handedness；`read_gltf(..., preserve_tangents=True)` 供 any2nif 啟用，同檔 `prepare_tangent_frames` 將生成切線的鏡射接縫拆開並固定正反手性，先生成再切分大型模型；裸 gltf2nif 預設仍使用舊算法。`tests/test_package_normal_frames.py` 讀實際 NIF T/B/N 與 DDS 驗光影方向，`tests/test_any2nif_tangents.py` 驗壞資料保護、legacy byte 契約及大型切分；`tests/test_generated_tangent_frames.py`／`test_generated_tangent_split.py` 驗無來源切線時的鏡射 UV、atlas 與切分；`tests/test_tangent_seams.py` 驗共用頂點的鏡射接縫與實際 normal DDS 方向。
-- **材質** `BSLightingShaderProperty`+`BSShaderTextureSet`（material 基名 → `<texprefix>\<基名>.dds` + 探測到的 `_n` normal map）；`--materials` 可用 named-mesh JSON 精確覆寫貼圖／alpha／雙面／effect，並合併或跳過 primitive。effect 序列化 CTD 的格式根因與離線驗證見 [EFFECT-SHADER-CTD.md](EFFECT-SHADER-CTD.md)。
-- **碰撞** `--collision` hulls JSON → `bhkCollisionObject→bhkRigidBody→bhkListShape→bhkConvexVerticesShape`（Havok 公尺、不乘 70；STATIC/STONE/MOTION_FIXED）
-- 服務 [darksouls-port](../darksouls-port/plan.md) 的 `FLVER→glTF→NIF` 管線；m0046B1A18 實件已跑（5 shape / 1684 tri / 64 KB，round-trip 位置誤差 ~1.7e-6 m）。
+見 [docs/nif-backends.md](docs/nif-backends.md)。
 
 ## 實作（`any2nif/` — 正向入口）
 
-所有來源先正規化成 glTF/GLB，再交給既有 `gltf2nif` 寫 SSE `.nif`；完整 CLI 契約見 [PROTOCOL.md](PROTOCOL.md#正向入口any2nif)。
-
-| 模組 | 職責 |
-|---|---|
-| `any2nif/cli.py` | CLI 編排：單位／軸向、貼圖、碰撞、PBR 材質與 NIF 寫出；exit 0/1/2/3。 |
-| `any2nif/source_resources.py` | 追蹤 OBJ／DAE／ZAE 外部資源讀取並驗證影像，將 trimesh 吞掉的缺檔／解碼錯誤改成明確失敗；`tests/test_trimesh_resources.py` 驗真來源與舊整包保護。 |
-| `any2nif/normalize.py` | 依副檔名分派：glTF/GLB 直通，OBJ/STL/PLY/DAE/ZAE/OFF/DXF/XYZ 走 trimesh，FBX 走 FBX2glTF。 |
-| `any2nif/trimesh_backend.py`、`fbx_backend.py` | 將非 glTF 來源正規化成 GLB，保留可用的 mesh／material 資訊；trimesh 路徑保留場景節點擺放，`tests/test_trimesh_instances.py` 驗真 DAE 的父子變換與整包碰撞；`tests/test_trimesh_colors.py` 驗真 PLY 頂點／面顏色到 NIF 的保留。 |
-| `any2nif/collision.py` | `none`／自動 box、convex、convex-mesh／既有 hulls JSON；`tests/test_any2nif_collision.py` 驗真 CLI 碰撞尺度、平面加厚與大型 mesh。 |
-| `any2nif/mesh_split.py` | 依 NIF 每 shape 的 65,535 頂點／三角形上限自動切分，保留材質／頂點資料與三角形順序；`tests/test_any2nif_mesh_split.py` 驗大型 mesh 真 NIF 讀回與資料拒絕；`tests/test_triangle_limit.py` 驗共用頂點但面數超限的完整讀回，碰撞 suite 另跑真整包不丟面且不增加凸包。 |
-| `any2nif/package.py` | 完整 Data 目錄暫存、DDS 格式／引用驗證、manifest、發布／回復；`tests/test_any2nif_package.py` 跨格式真 CLI、所有貼圖槽與失敗保留驗證。 |
-| `any2nif/package_materials.py` | 自包含 glTF、安全獨立材質名、缺圖拒絕、diffuse RGB 烘焙；`tests/test_package_materials.py` 驗外部／GLB／data URI 影像與材質限制。`tests/test_package_alpha_mask.py` 直接讀整包 NIF／DDS，驗透明裁切位元、8-bit 門檻邊界與 alpha 倍率儲存。 |
-| `any2nif/package_uv.py` | 整包的替代 UV 與共用貼圖變換烘焙、單 UV／法線切線限制；`tests/test_package_uv.py` 讀回 NIF 驗座標與失敗保護。 |
-| `any2nif/package_bake.py`、`bake_geometry.py` | 跨 UV 圖片重烘、AO 合成、逐實例／primitive 分離與頂點重映射；`tests/test_package_bake.py`、`test_bake_instances.py`、`test_package_normal_frames.py`、`test_package_sampler.py` 驗像素、法線、採樣設定、幾何與失敗保護。 |
-| `any2nif/uv_atlas.py` | xatlas 排版、像素覆蓋與邊緣補色；`tests/test_uv_atlas.py` 驗幾何保留、重疊與細面。 |
-| `any2nif/texture_sampling.py`、`normal_bake.py` | glTF wrap／濾波／sRGB 採樣及法線切線換算；`tests/test_texture_sampling.py`、`test_normal_bake.py` 驗解析值與方向。 |
-| `tools/build_sheen_validation.py` | SheenChair 1024／2048 獨立路徑的驗收包、實際成品與 ZIP 讀回；操作見 [HOME-VALIDATION.md](HOME-VALIDATION.md)。 |
-| `tools/smoke_real_assets.py` | 固定來源與 SHA-256 的公開模型下載／離線試轉，含真實網格 UV 衍生案例與 SheenChair DDS 顏色抽查；`tests/test_real_asset_validation.py` 驗抽查器；操作與結果見 [REAL-ASSETS.md](REAL-ASSETS.md)。 |
-| `any2nif/transform.py` | 將來源單位換算成公尺，並把來源 Z-up 正規化成 glTF Y-up；`tests/test_any2nif_transform.py` 驗無效縮放拒絕與負縮放的法線／繞向。 |
-| `any2nif/textures.py` | glTF 圖像轉 Skyrim diffuse／normal／specular／emissive `.dds` 槽位；烘焙法線強度。 |
+見 [docs/package-backends.md](docs/package-backends.md)。
 
 ## 實作（`tex2dds/` — 貼圖編碼）
 
-純 Python 將 Pillow 可解碼影像寫成 Skyrim 可用 BC1/BC3 DDS；完整 CLI 契約見 [PROTOCOL.md](PROTOCOL.md#貼圖編碼tex2dds)。
-
-| 模組 | 職責 |
-|---|---|
-| `tex2dds/cli.py` | 單檔轉換 CLI 與 exit 0/1/2。 |
-| `tex2dds/pipeline.py` | 解碼、pow2 resize、normal green flip、mipmap chain 與格式選擇。 |
-| `tex2dds/bcn.py` | 純 Python BC1／BC3 block encoder。 |
-| `tex2dds/dds.py` | 寫入 DXT1／DXT5 DDS header 與 mip payload。 |
+見 [docs/package-backends.md](docs/package-backends.md)。
 
 ## Open
 
