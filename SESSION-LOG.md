@@ -6,6 +6,10 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 ## 現役狀態
 
+2026-11-02 單模型 → ModForge 切片離線完成：新 opt-in [modforge_package](MODFORGE-PACKAGE.md) 沿現有 CLI，原創 GLB → box 碰撞 NIF／DDS → 單 StaticSpec → 真 ESP；Mutagen catalog 讀回唯一 Static／model、reader／Pillow 與八角點碰撞鏈均驗證。Done when: 完整包可重建、引用齊全、安全路徑與失敗保留舊包有正反例，文件對齊。合成輸出留忽略的 `backend/modforge-validation/`，未部署、遊戲外觀與站立未驗。
+
+本輪驗證：本流程 focused **27 passed**；converter 完整離線 suite（包含真 ModForge live contract）**530 passed、80 既有 warnings**。最後 Windows junction 防護改用 `lstat`，另以 scoped safety tests **18 passed** 驗證，未重跑整套。ModForge 原始碼未改，Windows SDK 10.0.301 真建置後 baseline 為 **1336 passed、1 skipped、1 failed**；唯一失敗是 `ModlistSnapshotTests.Fixtures_CrlfAndLfProduceByteIdenticalJson`：`fixtures/modlist-snapshot/lf/modlist.txt` 的 HEAD 為 6 個 LF，但 `core.autocrlf=true` 的既有 checkout 變成 6 個 CRLF，觸發測試第 36 行的 LF-only assertion；未改 fixture 或全域設定。
+
 2026-09-10 MASK 透明裁切修正完成：依 NifTools AlphaFlags／TestFunction 將誤開混合、比較 ALWAYS 的 0x0201 改為關閉混合、GREATER_EQUAL 的 0x1A00；門檻採 ceil(cutoff × 255)，合法 cutoff > 1 使用 NEVER。真 glTF／PNG 經完整 CLI 後直接讀 NIF 與 DDS，驗 0／0.25／0.499／0.5／1／1.1 的比較邊界，另驗 alpha 倍率只存材質、不重複烘入；BLEND 與 raw overrides 既有測試通過。修正前 4 項新測試因錯誤 blend bit 失敗；最終新測試 7 passed，完整 suite **499 passed、80 warnings**。這是離線格式驗證，非遊戲裁切驗收。
 
 SheenChair 六個來源材質均為 OPAQUE，透明裁切修正不影響最新 `160024` 驗收包。已重驗兩 ZIP 的 SHA256SUMS、CRC、12 個封裝檔案逐檔與 Data bytes 相同；最新批次操作說明同步，原包雜湊不變。Done when 已達成；遊戲內驗收留回家，ZIP 未進 Git，需攜帶整批或自行重建。
@@ -54,4 +58,4 @@ SheenChair 六個來源材質均為 OPAQUE，透明裁切修正不影響最新 `
 
 ## 後續方向
 
-跨 UV 重烘已完成；共用 UV 的 normal 旋轉／鏡射／不等比縮放也已路由重烘，零縮放仍拒絕。共用 UV 的非 REPEAT／nearest sampler 已路由重烘。True PBR、反向貼圖、蒙皮／動畫、凹形碰撞自動拆分與 ModForge spec 的黑盒接線仍是另外的工作。本輪不宣稱這些已完成；舊 idea 的入口已改標目前實作與歷史方案。
+跨 UV 重烘已完成；共用 UV 的 normal 旋轉／鏡射／不等比縮放也已路由重烘，零縮放仍拒絕。共用 UV 的非 REPEAT／nearest sampler 已路由重烘。True PBR、反向貼圖、蒙皮／動畫、凹形碰撞自動拆分與通用 ModForge `modelSource`／`importmesh` 接線仍是另外的工作；單 StaticSpec 完整組包已有 [opt-in 入口](MODFORGE-PACKAGE.md)。本輪不宣稱這些已完成；舊 idea 的入口已改標目前實作與歷史方案。

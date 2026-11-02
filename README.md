@@ -11,6 +11,10 @@
 - **model-porting**（[workflows/idea/asset-pipelines/model-porting](../ModForge/workflows/idea/asset-pipelines/model-porting/README.md)）已把**正向**（外部 FBX/OBJ/glTF → `.nif`）規劃得很深，但**只有正向**。
 - 兩者其實是同一把工具的兩個方向。與其各做各的，不如收斂成一個轉換器，正向沿用 model-porting 的決策、反向補上。
 
+## 單模型接到 ModForge
+
+[單模型完整包](MODFORGE-PACKAGE.md)提供 opt-in 的自包含 GLB → 既有 converter → 單 StaticSpec → 真 ESP／NIF／DDS 流程，含 Mutagen 讀回與失敗保留。可用 `tools/build_modforge_box.py` 重建原創小箱子，不需要遊戲素材或 Blender。
+
 ## 一條命令轉成完整資產目錄
 
 在專案環境已裝好依賴後：
@@ -115,6 +119,9 @@ python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--coll
 | `any2nif/package_bake.py`、`bake_geometry.py` | 跨 UV 圖片重烘、AO 合成、逐實例／primitive 分離與頂點重映射；`tests/test_package_bake.py`、`test_bake_instances.py`、`test_package_normal_frames.py`、`test_package_sampler.py` 驗像素、法線、採樣設定、幾何與失敗保護。 |
 | `any2nif/uv_atlas.py` | xatlas 排版、像素覆蓋與邊緣補色；`tests/test_uv_atlas.py` 驗幾何保留、重疊與細面。 |
 | `any2nif/texture_sampling.py`、`normal_bake.py` | glTF wrap／濾波／sRGB 採樣及法線切線換算；`tests/test_texture_sampling.py`、`test_normal_bake.py` 驗解析值與方向。 |
+| `modforge_package/cli.py`、`modforge_package/__main__.py`、`modforge_package/__init__.py` | opt-in 單 StaticSpec 組包入口；呼既有 any2nif／ModForge package／catalog，真讀 ESP 後才發布；`tests/test_modforge_package.py` 驗跨 repo production contract與失敗保護。 |
+| `modforge_package/validation.py`、`modforge_package/safety.py` | converter manifest／NIF／DDS／碰撞鏈／ESP 讀回驗證，安全路徑、ownership 與可回復發布。 |
+| `tools/build_modforge_box.py` | 重建帶嵌入 PNG 的原創非對稱箱子 GLB；操作見 [MODFORGE-PACKAGE](MODFORGE-PACKAGE.md)。 |
 | `tools/build_sheen_validation.py` | SheenChair 1024／2048 獨立路徑的驗收包、實際成品與 ZIP 讀回；操作見 [HOME-VALIDATION.md](HOME-VALIDATION.md)。 |
 | `tools/smoke_real_assets.py` | 固定來源與 SHA-256 的公開模型下載／離線試轉，含真實網格 UV 衍生案例與 SheenChair DDS 顏色抽查；`tests/test_real_asset_validation.py` 驗抽查器；操作與結果見 [REAL-ASSETS.md](REAL-ASSETS.md)。 |
 | `any2nif/transform.py` | 將來源單位換算成公尺，並把來源 Z-up 正規化成 glTF Y-up；`tests/test_any2nif_transform.py` 驗無效縮放拒絕與負縮放的法線／繞向。 |

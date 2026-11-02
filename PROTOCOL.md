@@ -194,4 +194,6 @@ usage: tex2dds [-h] [--format {auto,bc1,bc3}] [--no-mipmaps] [--normal-map] [--r
 
 ## 與 ModForge `package` 的關係
 
+單一自包含 GLB 的 opt-in `python -m modforge_package` 已接現有 converter、單 StaticSpec、ModForge `package` 與 catalog 真讀回，契約／重建／發布保護見 [MODFORGE-PACKAGE.md](MODFORGE-PACKAGE.md)。此入口不改 `any2nif` 契約，也未新增通用 `modelSource`／`importmesh`。
+
 nif→glTF 是**反向**（純預覽代理）；glTF→nif（`gltf2nif`，上節）是**移植方向**，產出的 `.nif`+`.dds` 進 ModForge spec 的 `assets/`，由 `package`（`StaticSpec.Model`）打包。正向（一般外部→nif）決策真相在 [model-porting/](../ModForge/workflows/idea/asset-pipelines/model-porting/README.md)。
