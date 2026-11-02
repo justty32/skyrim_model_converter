@@ -6,6 +6,8 @@ Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目
 
 ## 現役狀態
 
+2026-11-02 家用隔離重建完成：converter `931df17`、ModForge `b60741b` 的 tracked HEAD archive，以既有 `.venv` 與 .NET SDK 10.0.112／NuGet cache 建置（`--no-restore -m:2 -p:UseSharedCompilation=false`，0 warnings／0 errors），沒有下載或安裝依賴。真合成 GLB → ESP／NIF／DDS／provenance 留 ignored `backend/home-modforge-20261102/`；`tests/test_modforge_package.py` 帶 freshly built `MODFORGE_DLL` 實跑 **28 passed、0 skipped**（14.92 秒），包含重建逐位元組一致、Mutagen 唯一 Static／引用、DDS 解碼、八角點碰撞與失敗保留舊包。逐檔 bytes／SHA-256 及來源 commits 在同批 `home-rebuild-evidence.json`。ModForge 來源與其他 session 的 dirty 檔未改；本輪未跑 converter 全套、未部署，遊戲外觀／尺寸方向／碰撞站立未驗。
+
 2026-11-02 單模型 → ModForge 切片離線完成：新 opt-in [modforge_package](MODFORGE-PACKAGE.md) 沿現有 CLI，原創 GLB → box 碰撞 NIF／DDS → 單 StaticSpec → 真 ESP；Mutagen catalog 讀回唯一 Static／model、reader／Pillow 與八角點碰撞鏈均驗證。Done when: 完整包可重建、引用齊全、安全路徑與失敗保留舊包有正反例，文件對齊。合成輸出留忽略的 `backend/modforge-validation/`，未部署、遊戲外觀與站立未驗。
 
 本輪驗證：本流程 focused **27 passed**；converter 完整離線 suite（包含真 ModForge live contract）**530 passed、80 既有 warnings**。最後 Windows junction 防護改用 `lstat`，另以 scoped safety tests **18 passed** 驗證，未重跑整套。ModForge 原始碼未改，Windows SDK 10.0.301 真建置後 baseline 為 **1336 passed、1 skipped、1 failed**；唯一失敗是 `ModlistSnapshotTests.Fixtures_CrlfAndLfProduceByteIdenticalJson`：`fixtures/modlist-snapshot/lf/modlist.txt` 的 HEAD 為 6 個 LF，但 `core.autocrlf=true` 的既有 checkout 變成 6 個 CRLF，觸發測試第 36 行的 LF-only assertion；該次未改 fixture 或全域設定。後續已由 ModForge `b60741b` 以限定 fixture 的 `.gitattributes` 修正 checkout 契約，C# 與 fixture Git blob 不變；Git for Windows／WSL × 三種 autocrlf 的六組 checkout 位元組一致，Windows 原生 .NET 完整離線結果 **1337 passed、1 skipped、0 failed**。操作與跨機界線見 [ModForge testing](../ModForge/workflows/testing.md#modlist-snapshot-fixture-換行契約)；本輪未執行 Linux .NET runtime。

@@ -74,3 +74,15 @@ WSL／Windows SDK 另設 `MODFORGE_DOTNET`。未提供已建置 DLL 時明確 sk
 完整本機驗收需帶它實跑。測試涵蓋真 GLB／converter／ModForge／Mutagen／NIF／DDS，
 重建一致性、失敗保留舊包、無權覆蓋／路徑拒絕，以及發布／還原失敗反例。
 遊戲內外觀、尺寸方向、碰撞站立仍未驗；這份離線包不代表實機通過。
+
+## 家用 Linux 隔離重建（2026-11-02）
+
+已用既有 `.venv/bin/python`、.NET SDK 10.0.112 與 NuGet cache 重建，沒有安裝或下載。
+ModForge `b60741b` 的 tracked HEAD archive 放本專案 ignored `backend/home-modforge-20261102/ModForge/`，
+複製原 checkout 的 CLI／Core `obj` 還原資訊後，以 `nice -n 19 dotnet build` 加
+`--no-restore -m:2 -p:UseSharedCompilation=false` 建置，0 warnings／0 errors；未使用或更動來源的 dirty 檔。
+
+同批 `box.glb`／`SyntheticBox/` 為 converter `931df17` 的真離線成品，
+`home-rebuild-evidence.json` 記來源 commits、逐檔 bytes 與 SHA-256，`build.log`／`package.log`／`tests.log` 留命令證據。
+帶隔離 CLI 的 `MODFORGE_DLL` 執行本頁 scoped suite：**28 passed、0 skipped**。
+涵蓋真 ESP Mutagen 讀回、NIF／DDS／碰撞、重建一致及失敗保留；沒有部署，遊戲內驗收仍待做。
