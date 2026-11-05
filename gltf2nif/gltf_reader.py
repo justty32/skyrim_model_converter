@@ -1,6 +1,6 @@
 """Read a glTF 2.0 file -> list[Mesh] (glTF space, Y-up metres), plus texture probing.
 
-Each glTF mesh primitive (triangles only) becomes one Mesh. Interleaved vertex
+Each glTF triangle-list, strip or fan primitive becomes one Mesh. Interleaved vertex
 buffers (byteStride) and non-zero accessor byteOffsets are both handled, so it
 reads what real exporters (SharpGLTF / the DarkSouls extractor) emit. The material
 NAME (extension stripped) carries the texture base name — nif_writer turns that into
@@ -25,6 +25,46 @@ _COMPONENT = {
 }
 _NUMCOMP = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4, "MAT4": 16}
 _TRIANGLES = 4  # glTF primitive.mode default
+_TRIANGLE_MODES = (4, 5, 6)
+
+
+def primitive_triangles(gltf, buffers, primitive, position_count: int, context: str):
+    """Validate source indices and expand glTF triangle topology without reordering vertices.
+
+    Strip parity follows the source window, including degenerate triangles. Fans
+    keep the first index as their centre. Repeated-index strip/fan faces do not
+    contribute a surface; triangle lists retain their historical byte contract.
+    """
+    if primitive.indices is not None:
+        index = primitive.indices
+        if index < 0 or index >= len(gltf.accessors):
+            raise GltfError(f"{context} indices accessor is out of range")
+        accessor = gltf.accessors[index]
+        if (accessor.normalized or accessor.type != "SCALAR" or
+                accessor.componentType not in (5121, 5123, 5125)):
+            raise GltfError(f"{context} has invalid indices accessor")
+        flat = [int(i) for i in _read_accessor(gltf, buffers, index)]
+    else:
+        flat = list(range(position_count))
+    if any(index < 0 or index >= position_count for index in flat):
+        raise GltfError(f"{context} has an out-of-range index")
+    mode = _TRIANGLES if primitive.mode is None else primitive.mode
+    if mode == _TRIANGLES:
+        if len(flat) % 3:
+            raise GltfError(f"{context} index count is not divisible by 3")
+        return [tuple(flat[i:i + 3]) for i in range(0, len(flat), 3)]
+    triangles = []
+    for i in range(len(flat) - 2):
+        if mode == 5:
+            a, b, c = flat[i:i + 3]
+            triangle = (a, b, c) if i % 2 == 0 else (a, c, b)
+        elif mode == 6:
+            triangle = (flat[0], flat[i + 1], flat[i + 2])
+        else:
+            raise GltfError(f"{context} has unsupported triangle mode {mode}")
+        if len(set(triangle)) == 3:
+            triangles.append(triangle)
+    return triangles
 
 
 def _normalise_component(value: int, component_type: int) -> float:
@@ -211,8 +251,8 @@ def read_gltf(path: str, *, preserve_tangents: bool = False) -> list[Mesh]:
                 raise GltfError(f"mesh {mi} primitive {pi} uses morph targets; only static meshes "
                                 "are supported")
             mode = _TRIANGLES if prim.mode is None else prim.mode
-            if mode != _TRIANGLES:
-                continue  # only triangle lists
+            if mode not in _TRIANGLE_MODES:
+                continue  # points and lines have no triangle surface
             attrs = prim.attributes
             if getattr(attrs, "POSITION", None) is None:
                 continue
@@ -278,21 +318,8 @@ def read_gltf(path: str, *, preserve_tangents: bool = False) -> list[Mesh]:
                     raise GltfError(
                         f"mesh {mi} primitive {pi} COLOR_0 count differs from POSITION"
                     )
-            if prim.indices is not None:
-                if prim.indices < 0 or prim.indices >= len(gltf.accessors):
-                    raise GltfError(f"mesh {mi} primitive {pi} indices accessor is out of range")
-                index_accessor = gltf.accessors[prim.indices]
-                if (index_accessor.normalized or index_accessor.type != "SCALAR" or
-                        index_accessor.componentType not in (5121, 5123, 5125)):
-                    raise GltfError(f"mesh {mi} primitive {pi} has invalid indices accessor")
-                flat = [int(i) for i in _read_accessor(gltf, buffers, prim.indices)]
-            else:
-                flat = list(range(len(positions)))
-            if len(flat) % 3:
-                raise GltfError(f"mesh {mi} primitive {pi} index count is not divisible by 3")
-            if any(index < 0 or index >= len(positions) for index in flat):
-                raise GltfError(f"mesh {mi} primitive {pi} has an out-of-range index")
-            tris = [tuple(flat[i:i + 3]) for i in range(0, len(flat), 3)]
+            tris = primitive_triangles(gltf, buffers, prim, len(positions),
+                                       f"mesh {mi} primitive {pi}")
             if not positions or not tris:
                 continue
             tangents = []

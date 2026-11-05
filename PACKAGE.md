@@ -14,6 +14,8 @@ OBJ／DAE／ZAE 匯入會檢查載入器實際要求的外部／壓縮包內資�
 
 超過 NIF 單一 shape 的 65,535 頂點或三角形限制時，會沿原本三角形順序自動切分；材質、法線、UV 與頂點色一起保留，不需要先手工拆模型。
 
+glTF 的 `TRIANGLES`、`TRIANGLE_STRIP` 與 `TRIANGLE_FAN` 都會保留表面。Strip／fan 先展開為三角形列表，再套節點變換、材質、碰撞與 UV 重烘；有索引與無索引來源皆可。Strip 遇重複索引形成的退化面會略過，但不重設後續面繞向的奇偶；fan 保留第一個索引為中心。非法索引會讓整包失敗並保留舊成品。點與線仍不輸出成表面。拓撲與節點鏡射規則依 [glTF mesh 規格](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#meshes-overview)。
+
 SheenChair 兩種解析度的成品重建與遊戲操作見 [回家驗收](HOME-VALIDATION.md)。
 
 ## 碰撞怎麼選

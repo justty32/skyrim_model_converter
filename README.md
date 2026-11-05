@@ -127,6 +127,8 @@ python -m gltf2nif <in.gltf> <out.nif> [--texprefix textures\dsport\m18] [--coll
 | `any2nif/transform.py` | 將來源單位換算成公尺，並把來源 Z-up 正規化成 glTF Y-up；`tests/test_any2nif_transform.py` 驗無效縮放拒絕與負縮放的法線／繞向。 |
 | `any2nif/textures.py` | glTF 圖像轉 Skyrim diffuse／normal／specular／emissive `.dds` 槽位；烘焙法線強度。 |
 
+glTF 讀取與整包 UV 重烘共用 `gltf2nif/gltf_reader.py:primitive_triangles`，保留 `TRIANGLES`／`TRIANGLE_STRIP`／`TRIANGLE_FAN` 的表面與繞向，不再略過 strip／fan；有索引與無索引都支援。`tests/test_gltf_topology.py` 驗混合拓撲、節點鏡射、屬性、真 NIF／整包 direct／atlas 讀回與非法索引失敗保護。
+
 ## 實作（`tex2dds/` — 貼圖編碼）
 
 純 Python 將 Pillow 可解碼影像寫成 Skyrim 可用 BC1/BC3 DDS；完整 CLI 契約見 [PROTOCOL.md](PROTOCOL.md#貼圖編碼tex2dds)。
