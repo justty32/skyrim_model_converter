@@ -2,6 +2,10 @@
 
 只列 open；已完成的看 git log 與專題文件（[PACKAGE](PACKAGE.md)、[MODFORGE-PACKAGE](MODFORGE-PACKAGE.md)、[REAL-ASSETS](REAL-ASSETS.md)、[EFFECT-SHADER-CTD](EFFECT-SHADER-CTD.md)）。
 
+## 主動推進
+
+- 使用者 2026-11-05 裁示恢復主動推進 → 下場開線：先讀 README／本檔定第一個切片。
+
 ## 待回家實機驗收
 
 離線測試不冒充遊戲驗收；細項與步驟在母 repo [WAIT_USER asset-converter](../../wait-user/feature-runtime/asset-converter.md)。
