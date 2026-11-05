@@ -1,63 +1,20 @@
 # Asset converter 續行
 
-Done when: 一般模型、貼圖與碰撞能用一條命令轉成完整 Data 目錄；模型引用的 DDS 全數存在且可解碼；失敗保留既有成品；glTF/GLB、OBJ、FBX 等路徑有離線驗證，CLI／測試／文件對齊。遊戲內外觀與站立驗收另行記錄，不用離線測試冒充。
+只列 open；已完成的看 git log 與專題文件（[PACKAGE](PACKAGE.md)、[MODFORGE-PACKAGE](MODFORGE-PACKAGE.md)、[REAL-ASSETS](REAL-ASSETS.md)、[EFFECT-SHADER-CTD](EFFECT-SHADER-CTD.md)）。
 
-2026-09-14 converter effect 材質 CTD 離線修正完成：`BSEffectShaderProperty` 誤用 lighting-only `Shader Type` 造成多 4-byte prefix，令引擎將 `0xFFFFFFFF` 讀成 `Num Extra Data List`。修正為 Name/count/Controller 的 12-byte prefix；新回歸獨立解碼 payload，舊實作實跑失敗 `(0, 4294967295, 0) != (-1, 0, -1)`。focused **7 passed**，完整 suite **503 passed、80 warnings**，格式證據與實機邊界見 [EFFECT-SHADER-CTD.md](EFFECT-SHADER-CTD.md)。兩個 DS 光柱需回家重產後進原 cell 驗收；本輪未改 consumer skip/materials。
+## 待回家實機驗收
 
-## 現役狀態
+離線測試不冒充遊戲驗收；細項與步驟在母 repo [WAIT_USER asset-converter](../../wait-user/feature-runtime/asset-converter.md)。
 
-2026-11-02 家用隔離重建完成：converter `931df17`、ModForge `b60741b` 的 tracked HEAD archive，以既有 `.venv` 與 .NET SDK 10.0.112／NuGet cache 建置（`--no-restore -m:2 -p:UseSharedCompilation=false`，0 warnings／0 errors），沒有下載或安裝依賴。真合成 GLB → ESP／NIF／DDS／provenance 留 ignored `backend/home-modforge-20261102/`；`tests/test_modforge_package.py` 帶 freshly built `MODFORGE_DLL` 實跑 **28 passed、0 skipped**（14.92 秒），包含重建逐位元組一致、Mutagen 唯一 Static／引用、DDS 解碼、八角點碰撞與失敗保留舊包。逐檔 bytes／SHA-256 及來源 commits 在同批 `home-rebuild-evidence.json`。ModForge 來源與其他 session 的 dirty 檔未改；本輪未跑 converter 全套、未部署，遊戲外觀／尺寸方向／碰撞站立未驗。
+- SheenChair 一鍵整包：布紋／木紋比例、法線方向、接縫、碰撞站立。最新批次 `backend/home-validation/20260910-160024-009333/`（ZIP 不進 Git，攜帶整批或照 [HOME-VALIDATION](HOME-VALIDATION.md) 重建）。
+- 兩個 DS 光柱：用 effect shader 修正版重產，進原 cell 驗收不 CTD、可見；之後才決定恢復 DS 管線的兩筆 `skip`。
+- 頂點色與 MASK 裁切：舊彩色／MASK NIF 需重轉後看顏色與挖空。
+- ModForge 單模型切片（`modforge_package`）：未部署，外觀／尺寸方向／碰撞站立未驗。
 
-2026-11-02 單模型 → ModForge 切片離線完成：新 opt-in [modforge_package](MODFORGE-PACKAGE.md) 沿現有 CLI，原創 GLB → box 碰撞 NIF／DDS → 單 StaticSpec → 真 ESP；Mutagen catalog 讀回唯一 Static／model、reader／Pillow 與八角點碰撞鏈均驗證。Done when: 完整包可重建、引用齊全、安全路徑與失敗保留舊包有正反例，文件對齊。合成輸出留忽略的 `backend/modforge-validation/`，未部署、遊戲外觀與站立未驗。
+## 後續方向（未開工）
 
-本輪驗證：本流程 focused **27 passed**；converter 完整離線 suite（包含真 ModForge live contract）**530 passed、80 既有 warnings**。最後 Windows junction 防護改用 `lstat`，另以 scoped safety tests **18 passed** 驗證，未重跑整套。ModForge 原始碼未改，Windows SDK 10.0.301 真建置後 baseline 為 **1336 passed、1 skipped、1 failed**；唯一失敗是 `ModlistSnapshotTests.Fixtures_CrlfAndLfProduceByteIdenticalJson`：`fixtures/modlist-snapshot/lf/modlist.txt` 的 HEAD 為 6 個 LF，但 `core.autocrlf=true` 的既有 checkout 變成 6 個 CRLF，觸發測試第 36 行的 LF-only assertion；該次未改 fixture 或全域設定。後續已由 ModForge `b60741b` 以限定 fixture 的 `.gitattributes` 修正 checkout 契約，C# 與 fixture Git blob 不變；Git for Windows／WSL × 三種 autocrlf 的六組 checkout 位元組一致，Windows 原生 .NET 完整離線結果 **1337 passed、1 skipped、0 failed**。操作與跨機界線見 [ModForge testing](../ModForge/workflows/testing.md#modlist-snapshot-fixture-換行契約)；本輪未執行 Linux .NET runtime。
+True PBR、反向貼圖、蒙皮／動畫、單 primitive 凹形碰撞自動拆分、通用 ModForge `modelSource`／`importmesh` 接線。
 
-2026-09-10 MASK 透明裁切修正完成：依 NifTools AlphaFlags／TestFunction 將誤開混合、比較 ALWAYS 的 0x0201 改為關閉混合、GREATER_EQUAL 的 0x1A00；門檻採 ceil(cutoff × 255)，合法 cutoff > 1 使用 NEVER。真 glTF／PNG 經完整 CLI 後直接讀 NIF 與 DDS，驗 0／0.25／0.499／0.5／1／1.1 的比較邊界，另驗 alpha 倍率只存材質、不重複烘入；BLEND 與 raw overrides 既有測試通過。修正前 4 項新測試因錯誤 blend bit 失敗；最終新測試 7 passed，完整 suite **499 passed、80 warnings**。這是離線格式驗證，非遊戲裁切驗收。
+## 環境
 
-SheenChair 六個來源材質均為 OPAQUE，透明裁切修正不影響最新 `160024` 驗收包。已重驗兩 ZIP 的 SHA256SUMS、CRC、12 個封裝檔案逐檔與 Data bytes 相同；最新批次操作說明同步，原包雜湊不變。Done when 已達成；遊戲內驗收留回家，ZIP 未進 Git，需攜帶整批或自行重建。
-
-2026-09-10 OBJ／DAE／ZAE 資源失敗保護完成：`source_resources.py` 記錄被 trimesh 吞掉的材質檔讀取／影像解碼錯誤，載入後回 exit 2 並指出資源；ZAE 保留既有「第一份 DAE」選取方式，但使用受檢查的壓縮包讀取器，避免 loader 重建 resolver 後繞過檢查。真來源測試驗缺 PNG、壞 PNG、缺 MTL、外部 DAE／ZAE 內部綠色貼圖、正常空白檔名與相對子目錄，以及錯誤後舊整包完整 bytes 不變。ZAE 修正前兩項新測試實際失敗；OBJ 移除檢查的反例回 exit 0 並發布白材質，證明測試會抓回歸。完整 suite **492 passed**；這不新增 trimesh 未解析的 MTL 貼圖槽位。
-
-2026-09-10 trimesh 場景擺放修正完成：重新包 GLB 時保留來源節點的累積變換與重複擺放，不再把所有零件重置到原點。真 DAE fixture 包含旋轉／位移父層和鏡射／不等比縮放子層，驗逐面三角形角點、winding／normal 與實際整包的兩個分件凸包位置。恢復舊 fresh-Scene 行為的反例讓兩項新測試均失敗。完整 suite **480 passed**，SheenChair GLB 路徑不受此次非 glTF 匯入修正影響。
-
-2026-09-10 PLY 顏色與 NIF 顏色標記修正完成：trimesh 匯入保留顯式頂點 RGBA，面色拆開共用頂點並保留原平滑法線，不把隱含灰色當來源顏色。真 ASCII PLY 測試驗 normalized GLB 與實際 package 的 RGBA、色界、幾何／法線及無色來源；舊 ColorVisuals 替換反例確實失敗。另依 [NifTools nif.xml](https://github.com/niftools/nifxml/blob/develop/nif.xml) 修正 VertexAttribute 與 SkyrimShaderPropertyFlags2 的 Vertex_Colors 為 bit 5（0x20），不再誤設 Instance（0x200）／Assume_Shadowmask（0x80）。Lighting／Effect 與 PLY 測試直接讀 NIF descriptor、RGBA bytes 與 shader flags，不依賴本工具 reader 的顏色解碼。完整 suite **484 passed**，無頂點色的 legacy NIF 雜湊基準仍通過；舊彩色 NIF 需重轉，實機顏色驗收記在母 repo WAIT_USER。SheenChair 四個來源 primitive 均無頂點色，最新驗收批次可沿用。
-
-2026-09-10 高面數模型切分修正完成：NIF 三角形數也是 16-bit，舊流程只查頂點數，65,536 面寫出後會讀回 0 面。any2nif 現在同時按頂點與面數切分，裸 writer 超限明確拒絕。33,489 頂點／66,248 面的共用頂點網格驗實際 NIF 逐角點、材質與切線；33,153 頂點／65,536 面的完整 package 驗 65,535＋1 面、DDS 解碼與單一來源凸包的邊界。恢復舊切分的反例確實變紅，完整 suite **478 passed**。SheenChair 各分件低於門檻，最新驗收批次仍為下列 160024 批，不需因此換包。
-
-2026-09-10 生成切線的鏡射 UV 接縫修正完成：共用頂點按 face 正反手性拆開，先生成 TANGENT 再做 NIF 頂點上限切分；來源與 atlas 皆以逐角點方向重烘，負縮放不再額外翻 normal Y。實際 NIF／DDS 回歸包含鏡射 U/V、node／全域反射、共用接縫與 65,538 頂點；完整 suite **470 passed**，四個真實模型通過。真實 SheenChair 曾抓到舊算法在小面邊中點的 basis 抵消，修正後兩種尺寸都通過。
-
-最新驗收批次為 `backend/home-validation/20260910-160024-009333/`：1024／2048 分別約 31／53 秒，ZIP 4,078,095／8,686,369 bytes。兩版皆 4 shapes、39,936 三角形、6 引用 DDS、4 凸包；幾何、尺寸、diffuse、manifest、ZIP CRC 與逐檔雜湊通過。新包包含切線／normal 方向修正，雜湊不同於舊批次；請攜帶最新整批或照 [HOME-VALIDATION](HOME-VALIDATION.md) 重建。遊戲內驗收仍待回家。
-
-2026-09-10 直通貼圖流程的來源 TANGENT 保留已完成：any2nif 啟用 reader opt-in，Mesh／切分／來源軸向／負縮放／writer 一路保留方向與 W；烘焙沿用相同驗證，缺 NORMAL 時忽略來源切線。無 NORMAL 的 atlas 案例另以刻意不同的有效 TANGENT，比較移除前後整包完全相同。22 個 normal-frame tests 直接解碼 NIF T/B/N 與 DDS，涵蓋旋轉、鏡射、不等比 node scale 及 `--scale -2 --up-axis z`，直通保持原 UV 與 8×8 normal DDS。13 個 tangent contracts 驗無效資料保留舊包、65,538 頂點的實際 NIF 切分，以及裸 reader 預設仍忽略來源 tangent；強制關閉 opt-in 的反例使 authored-normal 測試失敗。四個真實模型試轉通過，SheenChair diffuse 結果不變。
-
-2026-09-10 SheenChair 1024／2048 回家驗收包完成：`tools/build_sheen_validation.py` 用不同資產路徑產出兩版，逐檔驗 manifest、實際 NIF 幾何／DDS 尺寸／diffuse 與 4 凸包，再驗 ZIP CRC／雜湊。成品在忽略的 `backend/home-validation/20260910-153248-865768/`；ZIP 約 4.08／8.69 MB，整批附署名、操作說明、報告與 SHA256SUMS。兩版檔案路徑無交集；不含 ESP、沒有部署。本輪用修正後程式重建，兩個 ZIP 雜湊與前一批相同。當輪完整 suite 437 passed，操作見 [HOME-VALIDATION](HOME-VALIDATION.md)，遊戲外觀與碰撞仍待回家。
-
-2026-09-10 共用 UV 的 normal 變換已完成：旋轉、鏡射、不等比縮放自動重烘；零縮放明確拒絕且保留舊包。15 組實際 NIF／DDS 法線方向測試通過（含來源提供／未提供 tangent）；shared 測試移除 AO 干擾，恢復舊路由的反例讓全部 10 組 shared cases 失敗。SheenChair 等四個真實模型試轉再次通過。
-
-2026-09-10 共用 UV 的 sampler 相容性已完成：邊緣延伸、鏡射重複與 nearest 放大採樣自動路由貼圖重烘；無效 sampler 索引／wrap／filter 明確拒絕並保留舊成品。新增 11 個實際 DDS／NIF 測試，一般 REPEAT＋linear 保持原 UV。完整 suite 與四個真實模型案例通過，SheenChair 顏色誤差與下列紀錄一致。
-
-2026-09-10 跨 UV 重烘已完成：不同槽的座標／變換自動排成逐 primitive／實例獨立 atlas，支援 wrap／採樣、線性 diffuse × AO、normal 切線換算及負縮放；`--bake-size` 64～4096，預設 1024。所有面皆檢查像素覆蓋，極細面配置獨立小區塊；沒有安全空間就要求提高尺寸並保留舊成品。新增 xatlas 0.0.11，僅裝專案 `.venv-wsl`。
-
-本輪 Done when 已達成：SheenChair 原版成功產出 4 shapes、39,936 三角形、6 個實際 DDS 引用、4 凸包；四材質 diffuse 抽查平均誤差 0.0044～0.0097，黑圖反例確實被拒。最終真實模型腳本四案例全數通過；細節與固定來源在 [REAL-ASSETS](REAL-ASSETS.md)。normal 方向、紅色大面／藍色微小島、重複擺放、非 triangle 略過與錯誤保護另有合成測試。
-
-4096 四槽合成模型完整 CLI 試轉 exit 0，約 89 秒、峰值 RSS 1,595,832 KiB（約 1.52 GiB）；烘焙逐槽／分塊處理，不把所有槽的浮點 atlas 同時常駐。來源／成品留忽略的 `backend/bake-memory/`。
-
-2026-09-10 真實模型與 UV 續行已完成：整包支援替代 UV、共用 KHR_texture_transform 的位移／旋轉／縮放／texCoord 覆寫，烘進單一 NIF UV。當時帶 normal 時限正值等比縮放與位移，不同槽的 UV 對應也仍拒絕；這些限制現已由重烘補上，normal 零縮放仍拒絕。新增 25 個測試，實際讀回 NIF 座標、normal DDS 引用並驗失敗保護。
-
-公開模型試轉與來源見 [REAL-ASSETS.md](REAL-ASSETS.md)：Lantern、Avocado 原版與 LanternUV 衍生版通過；SheenChair 原先因混合 UV 拒絕，現已成功試轉。`tools/smoke_real_assets.py` 固定來源版本與 SHA-256，素材／產物留忽略的 `backend/real-assets/`。整支腳本已實跑通過，包含三角形／位置／UV 讀回；尚無遊戲畫面驗收。
-
-2026-09-10 分件碰撞已完成：`--collision convex-mesh` 依正規化後的 node × primitive 各自建立凸包。離線驗證分件門框保留空隙、重複擺放與尺度軸向、多凸包 NIF 引用，以及 65,538 頂點完整整包的渲染切分不改碰撞分組。單一 primitive 的凹洞仍不會自動拆分。
-
-2026-09-10 續行已完成：`normalTexture.scale` 改為烘進法線貼圖，支援歸零、減弱、加強與負值；非有限值仍拒絕。整包測試實際讀回 NIF 引用的 DDS，確認共用 diffuse 不受影響、重跑一致、壞設定保留既有整包。
-
-2026-09-10 公司 WSL：使用者選定的一鍵一般模型流程已完成離線實作，使用方式見 [PACKAGE.md](PACKAGE.md)。實機外觀／尺寸方向／碰撞站立仍待回家驗收，記在母 repo 的 [WAIT_USER](../../wait-user/feature-runtime.md#asset-converter-一鍵靜態模型整包2026-09-10)。
-
-本次獨立 WSL 環境在 `.venv-wsl`，由既有 uv 建立；FBX2glTF 在忽略的 `tools/bin/`。Windows `.venv` 保留。使用者已授權專案內安裝依賴與 push。
-
-驗證：`.venv-wsl/bin/python -m pytest -q --disable-warnings` → **499 passed、零 skipped**；包含真 FBX2glTF、跨格式完整 Data 目錄、所有 DDS 槽位、65535 頂點切分、負縮放、錯誤資料與發布／回復。仍有既有套件的 deprecation warnings。
-
-跨 repo darksouls-port live contract 的 soulstruct 阻塞已於 2026-09-14 解除（DSPort `547a4b7`）：`p1_batch.py` 只在完整 P1 batch 的 DS initial-state analysis 階段延後載入 parser，helper contract 不再 eager import。公司 `.venv-wsl` 真實執行 `p1_batch.convert_or_reuse()` → production `gltf2nif` → production reader，render/collision 與 stale-output failure cleanup **2/2 通過**；完整 batch 仍明確需要 soulstruct 與 DS 素材。前輪 writer 新增可選 authored tangents，但裸 reader 預設不啟用；既有單／雙 shape 的 NIF SHA-256 基準與新 opt-in 隔離測試通過。
-
-## 後續方向
-
-跨 UV 重烘已完成；共用 UV 的 normal 旋轉／鏡射／不等比縮放也已路由重烘，零縮放仍拒絕。共用 UV 的非 REPEAT／nearest sampler 已路由重烘。True PBR、反向貼圖、蒙皮／動畫、凹形碰撞自動拆分與通用 ModForge `modelSource`／`importmesh` 接線仍是另外的工作；單 StaticSpec 完整組包已有 [opt-in 入口](MODFORGE-PACKAGE.md)。本輪不宣稱這些已完成；舊 idea 的入口已改標目前實作與歷史方案。
+WSL 用 `.venv-wsl`（`.venv-wsl/bin/python -m pytest -q`），FBX2glTF 在忽略的 `tools/bin/`；Windows 用 `.venv`。
