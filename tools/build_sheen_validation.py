@@ -21,7 +21,7 @@ from PIL import Image
 from gltf2nif import read_gltf
 from nif2gltf._binreader import _Reader
 from nif2gltf.nif_reader import _read_header, read_nif
-from tools.smoke_real_assets import ASSETS, REV, _corner_geometry, validate_sheen_diffuse
+from tools.real_asset_checks import ASSETS, REV, _corner_geometry, validate_sheen_diffuse
 
 SOURCE_SHA256 = ASSETS["SheenChair"]
 SOURCE_URL = ("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/"

@@ -8,13 +8,7 @@
 
 ## 重跑
 
-在 model-converter 根目錄執行：
-
-```bash
-.venv-wsl/bin/python tools/smoke_real_assets.py --download
-```
-
-首次下載約 22 MB，來源與成品在忽略的 `backend/real-assets/`，不進版控。已有素材可省略 `--download`；腳本核對固定 SHA-256，既有不符檔案會失敗。來源 repo 固定在 `90d7ede14c7e280af263824604b427a1ca02cb66`，各 GLB 的雜湊在腳本 `ASSETS`。可帶這支腳本回家重新產包，無須攜帶公司絕對路徑。
+四模型試轉腳本已不在 repo；要重產 SheenChair 用 [回家驗收](HOME-VALIDATION.md) 的打包命令。來源 repo 固定在 `90d7ede14c7e280af263824604b427a1ca02cb66`，各 GLB 的雜湊在 `tools/real_asset_checks.py` 的 `ASSETS`。
 
 | 案例 | 離線結果 |
 |---|---|

@@ -1,15 +1,11 @@
-"""Opt-in downloaded real asset trial; run from the repository root.
+"""Pinned real-asset sources and readback checks shared by build_sheen_validation.py.
 
 Sources, licenses and expected limitations are documented in REAL-ASSETS.md.
-Downloads and Data outputs stay in ignored backend/real-assets/.
 """
 
-import argparse
-import hashlib
 import json
 from pathlib import Path
 import sys
-import urllib.request
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -17,15 +13,11 @@ import numpy as np
 from PIL import Image
 from pygltflib import GLTF2
 
-from any2nif.cli import main
 from any2nif.package import MANIFEST, texture_references
-from any2nif.package_materials import (_buffers, _decode_rgba, _image_bytes,
-                                       _material_texture_infos)
+from any2nif.package_materials import _buffers, _decode_rgba, _image_bytes
 from any2nif.package_uv import _mapping
 from any2nif.texture_sampling import sample_rgba
-from gltf2nif import read_gltf
 from gltf2nif.gltf_reader import _read_accessor, _scene_instances
-from nif2gltf.nif_reader import read_nif
 
 REV = "90d7ede14c7e280af263824604b427a1ca02cb66"
 ASSETS = {
@@ -138,65 +130,3 @@ def validate_sheen_diffuse(source, output, original, result):
     assert set(errors_by_material) == {primitive.material for primitive in primitives}
     return errors_by_material
 
-
-def run():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--download", action="store_true", help="fetch missing pinned assets")
-    args = parser.parse_args()
-    root = Path(__file__).resolve().parents[1] / "backend" / "real-assets"
-    root.mkdir(parents=True, exist_ok=True)
-    for name, digest in ASSETS.items():
-        source = root / f"{name}.glb"
-        if not source.exists() and args.download:
-            url = (f"https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/"
-                   f"{REV}/Models/{name}/glTF-Binary/{name}.glb")
-            with urllib.request.urlopen(url, timeout=60) as response:
-                payload = response.read()
-            assert hashlib.sha256(payload).hexdigest() == digest, name
-            source.write_bytes(payload)
-        assert source.exists(), f"Missing {source}; rerun with --download"
-        assert hashlib.sha256(source.read_bytes()).hexdigest() == digest, name
-
-    for name in ["Lantern", "Avocado", "SheenChair", "LanternUV"]:
-        source = root / f"{name}.glb"
-        if name == "LanternUV":
-            # Controlled derivative of real geometry/images, not an upstream asset.
-            gltf = GLTF2().load(str(root / "Lantern.glb"))
-            for mesh in gltf.meshes:
-                for primitive in mesh.primitives:
-                    primitive.attributes.TEXCOORD_1 = primitive.attributes.TEXCOORD_0
-            for material in gltf.materials:
-                for _, info in _material_texture_infos(material):
-                    transform = {"texCoord": 1, "scale": [2, 2], "offset": [.25, .5]}
-                    if isinstance(info, dict):
-                        info.setdefault("extensions", {})["KHR_texture_transform"] = transform
-                    else:
-                        info.extensions = {**(info.extensions or {}), "KHR_texture_transform": transform}
-            gltf.save_binary(str(source))
-        output = root / f"Data-{name}"
-        source_digest = hashlib.sha256(source.read_bytes()).hexdigest()
-        code = main([str(source), str(output), "--package", "--collision", "convex-mesh"])
-        assert code == 0, name
-        assert hashlib.sha256(source.read_bytes()).hexdigest() == source_digest, name
-        manifest = json.loads((output / MANIFEST).read_text())
-        result = read_nif((output / manifest["mesh"]).read_bytes())
-        original = read_gltf(str(root / ("Lantern.glb" if name == "LanternUV" else f"{name}.glb")))
-        assert len(result) == len(original)
-        for before, after in zip(original, result):
-            _corner_geometry(before, after, atlas=name == "SheenChair")
-            if name != "SheenChair":
-                expected_uv = np.asarray(before.uvs)
-                if name == "LanternUV":
-                    expected_uv = expected_uv * 2 + [.25, .5]
-                np.testing.assert_allclose(after.uvs, expected_uv, atol=.004)
-        if name == "SheenChair":
-            stats = validate_sheen_diffuse(source, output, original, result)
-            print('SheenChair diffuse samples: ' + ', '.join(
-                f'material {i}: n={n}, MAE={mae:.4f}, p90={p90:.4f}'
-                for i, (mae, p90, n) in sorted(stats.items())), flush=True)
-        print(f"{name}: {len(result)} shapes, {sum(len(m.triangles) for m in result)} triangles, "
-              f"{len(manifest['textures'])} DDS; geometry/atlas readback passed", flush=True)
-
-
-if __name__ == "__main__":
-    run()
